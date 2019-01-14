@@ -28,6 +28,6 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/summary", handlers.SummaryHandler)
-	//log.Printf("server is listening at http://%s", addr)
+	log.Printf("server is listening at http://%s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

@@ -69,17 +69,25 @@ func SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	https://golang.org/pkg/encoding/json/#NewEncoder
 	*/
 	w.Header().Add(headerCORS, corsAnyOrigin)
-	url := r.URL.Path
-	html, err := fetchHTML(url)
+	w.Header().Add("Content-Type", "application/json")
+	URL := r.FormValue("url")
+	if URL == "" {
+		http.Error(w, fmt.Sprintf("Bad Request! Try something else! %v", http.StatusBadRequest), 400)
+	}
+	html, err := fetchHTML(URL)
 	if err != nil {
-		log.Fatalf("error fetching HTML: %v", err)
+		http.Error(w, fmt.Sprintf("Bad Request! Try something else! %v", err), 400)
 	}
-	pageSummary, err := extractSummary(url, html)
-	defer html.Close()
+
+	pageSummary, err := extractSummary(URL, html)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Bad Request! %v", err), 500)
+	}
 	enc := json.NewEncoder(w)
-	if err := enc.Encode(pageSummary); err != nil {
-		fmt.Printf("error encoding struct into JSON: %v\n", err)
+	if enc.Encode(pageSummary); err != nil {
+		fmt.Printf("error fetching HTML %v", err)
 	}
+	defer html.Close()
 }
 
 //fetchHTML fetches `pageURL` and returns the body stream or an error.
@@ -102,36 +110,48 @@ func fetchHTML(pageURL string) (io.ReadCloser, error) {
 	*/
 	resp, err := http.Get(pageURL)
 	if err != nil {
-		log.Fatalf("error fetching URL: %v\n", err)
+		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, err
+		return nil, fmt.Errorf("Status code error: %d", resp.StatusCode)
 	}
 	ctype := resp.Header.Get("Content-Type")
 	if !strings.HasPrefix(ctype, "text/html") {
-		return nil, err
+		return nil, fmt.Errorf("Content type error: %s", ctype)
 	}
-	//defer resp.Body.Close()
 	return resp.Body, nil
 }
 
-//extractSummary tokenizes the `htmlStream` and populates a PageSummary
-//struct with the page's summary meta-data.
+// convert relative path to absolute path
+func makeAbsPath(path, pageURL string) string {
+	parsedURL, err := url.Parse(path)
+	if err != nil {
+		log.Fatalf("error parsing path: %v\n", err)
+	}
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		log.Fatalf("error parsing URL: %v\n", err)
+	}
+	return base.ResolveReference(parsedURL).String()
+}
+
+// //extractSummary tokenizes the `htmlStream` and populates a PageSummary
+// //struct with the page's summary meta-data.
 func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, error) {
-	/*TODO: tokenize the `htmlStream` and extract the page summary meta-data
-	according to the assignment description.
+	// 	/*TODO: tokenize the `htmlStream` and extract the page summary meta-data
+	// 	according to the assignment description.
 
-	To test your implementation of this function, run the TestExtractSummary
-	test in summary_test.go. You can do that directly in Visual Studio Code,
-	or at the command line by running:
-		go test -run TestExtractSummary
+	// 	To test your implementation of this function, run the TestExtractSummary
+	// 	test in summary_test.go. You can do that directly in Visual Studio Code,
+	// 	or at the command line by running:
+	// 		go test -run TestExtractSummary
 
-	Helpful Links:
-	https://drstearns.github.io/tutorials/tokenizing/
-	http://ogp.me/
-	https://developers.facebook.com/docs/reference/opengraph/
-	https://golang.org/pkg/net/url/#URL.ResolveReference
-	*/
+	// 	Helpful Links:
+	// 	https://drstearns.github.io/tutorials/tokenizing/
+	// 	http://ogp.me/
+	// 	https://developers.facebook.com/docs/reference/opengraph/
+	// 	https://golang.org/pkg/net/url/#URL.ResolveReference
+	// 	*/
 
 	tokenizer := html.NewTokenizer(htmlStream)
 	images := []*PreviewImage{}
@@ -148,7 +168,7 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 			log.Fatalf("error tokenizing HTML: %v", tokenizer.Err())
 		}
 
-		if token.Type == html.StartTagToken || token.Type == html.SelfClosingTagToken {
+		if tokenType == html.StartTagToken || tokenType == html.SelfClosingTagToken {
 			if "meta" == tag || "link" == tag {
 				for _, attr := range token.Attr {
 					proKey := attr.Key
@@ -176,57 +196,37 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 									if ps.Description == "" {
 										ps.Description = conVal
 									}
+								case "og:image":
+									image := new(PreviewImage)
+									images = append(images, image)
+									ps.Images = images
+									abURL := conVal
+									if path.IsAbs(abURL) {
+										abURL = makeAbsPath(conVal, pageURL)
+									}
+									images[len(images)-1].URL = abURL
+								case "og:image:secure_url":
+									abURL := conVal
+									if path.IsAbs(abURL) {
+										abURL = makeAbsPath(conVal, pageURL)
+									}
+									images[len(images)-1].SecureURL = abURL
 								case "og:image:type":
 									images[len(images)-1].Type = conVal
 								case "og:image:height":
 									height, err := strconv.Atoi(conVal)
 									if err != nil {
-										log.Println("Cannot find height")
+										return nil, fmt.Errorf("Cannot find height %v", err)
 									}
 									images[len(images)-1].Height = height
 								case "og:image:width":
 									width, err := strconv.Atoi(conVal)
 									if err != nil {
-										log.Println("Cannot find width")
+										return nil, fmt.Errorf("Cannot find width %v", err)
 									}
 									images[len(images)-1].Width = width
 								case "og:image:alt":
 									images[len(images)-1].Alt = conVal
-								case "og:image:secure_url":
-									//makeAbsPath(conVal)
-									abURL := conVal
-									if path.IsAbs(abURL) {
-										parsedURL, err := url.Parse(conVal)
-										if err != nil {
-											log.Fatalf("error parsing path: %v\n", err)
-										}
-										base, err := url.Parse(pageURL)
-										if err != nil {
-											log.Fatalf("error parsing URL: %v\n", err)
-										}
-										abURL = base.ResolveReference(parsedURL).String()
-										fmt.Println(abURL)
-									}
-									images[len(images)-1].SecureURL = abURL
-								case "og:image":
-									image := new(PreviewImage)
-									images = append(images, image)
-									ps.Images = images
-									//makeAbsPath(conVal)
-									abURL := conVal
-									if path.IsAbs(abURL) {
-										parsedURL, err := url.Parse(conVal)
-										if err != nil {
-											log.Fatalf("error parsing path: %v\n", err)
-										}
-										base, err := url.Parse(pageURL)
-										if err != nil {
-											log.Fatalf("error parsing URL: %v\n", err)
-										}
-										abURL = base.ResolveReference(parsedURL).String()
-										fmt.Println(abURL)
-									}
-									images[len(images)-1].URL = abURL
 								case "author":
 									for _, attr := range token.Attr {
 										if attr.Key == "content" {
@@ -254,16 +254,7 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 							case "href":
 								abURL := val
 								if path.IsAbs(abURL) {
-									parsedURL, err := url.Parse(val)
-									if err != nil {
-										log.Fatalf("error parsing path: %v\n", err)
-									}
-									base, err := url.Parse(pageURL)
-									if err != nil {
-										log.Fatalf("error parsing URL: %v\n", err)
-									}
-									abURL = base.ResolveReference(parsedURL).String()
-									fmt.Println(abURL)
+									abURL = makeAbsPath(val, pageURL)
 								}
 								icon.URL = abURL
 							case "sizes":
@@ -272,7 +263,7 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 									height, err := strconv.Atoi(size[0])
 									width, err := strconv.Atoi(size[1])
 									if err != nil {
-										log.Println("Cannot find height or width")
+										fmt.Errorf("Cannot find height or width: %v", err)
 									}
 									icon.Height = height
 									icon.Width = width

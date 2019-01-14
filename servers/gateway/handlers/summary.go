@@ -1,8 +1,17 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+
+	"golang.org/x/net/html"
 )
 
 //PreviewImage represents a preview image for a page
@@ -27,6 +36,9 @@ type PageSummary struct {
 	Icon        *PreviewImage   `json:"icon,omitempty"`
 	Images      []*PreviewImage `json:"images,omitempty"`
 }
+
+const headerCORS = "Access-Control-Allow-Origin"
+const corsAnyOrigin = "*"
 
 //SummaryHandler handles requests for the page summary API.
 //This API expects one query string parameter named `url`,
@@ -56,6 +68,18 @@ func SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	https://golang.org/pkg/net/http/#Error
 	https://golang.org/pkg/encoding/json/#NewEncoder
 	*/
+	w.Header().Add(headerCORS, corsAnyOrigin)
+	url := r.URL.Path
+	html, err := fetchHTML(url)
+	if err != nil {
+		log.Fatalf("error fetching HTML: %v", err)
+	}
+	pageSummary, err := extractSummary(url, html)
+	defer html.Close()
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(pageSummary); err != nil {
+		fmt.Printf("error encoding struct into JSON: %v\n", err)
+	}
 }
 
 //fetchHTML fetches `pageURL` and returns the body stream or an error.
@@ -76,7 +100,19 @@ func fetchHTML(pageURL string) (io.ReadCloser, error) {
 	Helpful Links:
 	https://golang.org/pkg/net/http/#Get
 	*/
-	return nil, nil
+	resp, err := http.Get(pageURL)
+	if err != nil {
+		log.Fatalf("error fetching URL: %v\n", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, err
+	}
+	ctype := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ctype, "text/html") {
+		return nil, err
+	}
+	//defer resp.Body.Close()
+	return resp.Body, nil
 }
 
 //extractSummary tokenizes the `htmlStream` and populates a PageSummary
@@ -96,5 +132,167 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 	https://developers.facebook.com/docs/reference/opengraph/
 	https://golang.org/pkg/net/url/#URL.ResolveReference
 	*/
-	return nil, nil
+
+	tokenizer := html.NewTokenizer(htmlStream)
+	images := []*PreviewImage{}
+	ps := new(PageSummary)
+	for {
+		tokenType := tokenizer.Next()
+		token := tokenizer.Token()
+		tag := token.Data
+		if tokenType == html.ErrorToken {
+			err := tokenizer.Err()
+			if err == io.EOF || tag == "/head" {
+				break
+			}
+			log.Fatalf("error tokenizing HTML: %v", tokenizer.Err())
+		}
+
+		if token.Type == html.StartTagToken || token.Type == html.SelfClosingTagToken {
+			if "meta" == tag || "link" == tag {
+				for _, attr := range token.Attr {
+					proKey := attr.Key
+					proVal := attr.Val
+					if proKey == "property" || proKey == "name" {
+						for _, attr := range token.Attr {
+							//ps.Type = "this is test"
+							//fmt.Println(ps.Type)
+							conKey := attr.Key
+							conVal := attr.Val
+							//fmt.Println("I am in content: " + conKey)
+							if conKey == "content" {
+								switch proVal {
+								case "og:type":
+									ps.Type = conVal
+								case "og:url":
+									ps.URL = conVal
+								case "og:title":
+									ps.Title = conVal
+								case "og:site_name":
+									ps.SiteName = conVal
+								case "og:description":
+									ps.Description = conVal
+								case "description":
+									if ps.Description == "" {
+										ps.Description = conVal
+									}
+								case "og:image:type":
+									images[len(images)-1].Type = conVal
+								case "og:image:height":
+									height, err := strconv.Atoi(conVal)
+									if err != nil {
+										log.Println("Cannot find height")
+									}
+									images[len(images)-1].Height = height
+								case "og:image:width":
+									width, err := strconv.Atoi(conVal)
+									if err != nil {
+										log.Println("Cannot find width")
+									}
+									images[len(images)-1].Width = width
+								case "og:image:alt":
+									images[len(images)-1].Alt = conVal
+								case "og:image:secure_url":
+									//makeAbsPath(conVal)
+									abURL := conVal
+									if path.IsAbs(abURL) {
+										parsedURL, err := url.Parse(conVal)
+										if err != nil {
+											log.Fatalf("error parsing path: %v\n", err)
+										}
+										base, err := url.Parse(pageURL)
+										if err != nil {
+											log.Fatalf("error parsing URL: %v\n", err)
+										}
+										abURL = base.ResolveReference(parsedURL).String()
+										fmt.Println(abURL)
+									}
+									images[len(images)-1].SecureURL = abURL
+								case "og:image":
+									image := new(PreviewImage)
+									images = append(images, image)
+									ps.Images = images
+									//makeAbsPath(conVal)
+									abURL := conVal
+									if path.IsAbs(abURL) {
+										parsedURL, err := url.Parse(conVal)
+										if err != nil {
+											log.Fatalf("error parsing path: %v\n", err)
+										}
+										base, err := url.Parse(pageURL)
+										if err != nil {
+											log.Fatalf("error parsing URL: %v\n", err)
+										}
+										abURL = base.ResolveReference(parsedURL).String()
+										fmt.Println(abURL)
+									}
+									images[len(images)-1].URL = abURL
+								case "author":
+									for _, attr := range token.Attr {
+										if attr.Key == "content" {
+											ps.Author = attr.Val
+											break
+										}
+									}
+								case "keywords":
+									for _, attr := range token.Attr {
+										if attr.Key == "content" {
+											keywords := strings.Split(attr.Val, ",")
+											for _, keyword := range keywords {
+												ps.Keywords = append(ps.Keywords, strings.Trim(string(keyword), " "))
+											}
+										}
+									}
+								}
+							}
+						}
+					} else if proKey == "rel" && proVal == "icon" {
+						icon := new(PreviewImage)
+						for _, attr := range token.Attr {
+							val := attr.Val
+							switch attr.Key {
+							case "href":
+								abURL := val
+								if path.IsAbs(abURL) {
+									parsedURL, err := url.Parse(val)
+									if err != nil {
+										log.Fatalf("error parsing path: %v\n", err)
+									}
+									base, err := url.Parse(pageURL)
+									if err != nil {
+										log.Fatalf("error parsing URL: %v\n", err)
+									}
+									abURL = base.ResolveReference(parsedURL).String()
+									fmt.Println(abURL)
+								}
+								icon.URL = abURL
+							case "sizes":
+								if val != "any" {
+									size := strings.Split(val, "x")
+									height, err := strconv.Atoi(size[0])
+									width, err := strconv.Atoi(size[1])
+									if err != nil {
+										log.Println("Cannot find height or width")
+									}
+									icon.Height = height
+									icon.Width = width
+								}
+							case "type":
+								icon.Type = val
+							}
+						}
+						ps.Icon = icon
+					}
+				}
+			} else if tag == "title" {
+				if ps.Title == "" {
+					tokenType = tokenizer.Next()
+					if tokenType == html.TextToken {
+						ps.Title = tokenizer.Token().Data
+					}
+				}
+			}
+		}
+	}
+	return ps, nil
 }

@@ -263,7 +263,7 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 									height, err := strconv.Atoi(size[0])
 									width, err := strconv.Atoi(size[1])
 									if err != nil {
-										fmt.Errorf("Cannot find height or width: %v", err)
+										return nil, fmt.Errorf("Cannot find height or width: %v", err)
 									}
 									icon.Height = height
 									icon.Width = width

@@ -126,11 +126,11 @@ func fetchHTML(pageURL string) (io.ReadCloser, error) {
 func makeAbsPath(path, pageURL string) string {
 	parsedURL, err := url.Parse(path)
 	if err != nil {
-		log.Fatalf("error parsing path: %v\n", err)
+		fmt.Errorf("error parsing path: %v\n", err)
 	}
 	base, err := url.Parse(pageURL)
 	if err != nil {
-		log.Fatalf("error parsing URL: %v\n", err)
+		fmt.Errorf("error parsing URL: %v\n", err)
 	}
 	return base.ResolveReference(parsedURL).String()
 }

@@ -5,4 +5,4 @@
 FROM nginx
 COPY . /usr/share/ngix/html
 ADD default.conf /etc/nginx/conf.d/default.conf
-ENTRYPOINT [ "/usr/share/ngix/html" ]
+EXPOSE 80

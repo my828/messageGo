@@ -22,12 +22,21 @@ func main() {
 	  that occur when trying to start the web server.
 	*/
 	addr := os.Getenv("ADDR")
-
 	if len(addr) == 0 {
 		addr = ":80"
 	}
+	tlsKeyPath := os.Getenv("TLSKEY")
+	if tlsKeyPath == "" {
+		log.Fatalf("No private key path!")
+	}
+	tlsCertPath := os.Getenv("TLSCERT")
+	if tlsCertPath == "" {
+		log.Fatalf("No certificate path!")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/summary", handlers.SummaryHandler)
 	log.Printf("server is listening at http://%s", addr)
+	//log.Fatal(http.ListenAndServeTLS(addr, tlsCertPath, tlsKeyPath, mux))
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

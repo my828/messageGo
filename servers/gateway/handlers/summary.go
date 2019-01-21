@@ -83,11 +83,13 @@ func SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Bad Request! %v", err), 500)
 	}
-	enc := json.NewEncoder(w)
-	if enc.Encode(pageSummary); err != nil {
-		fmt.Printf("error fetching HTML %v", err)
-	}
+	// enc := json.NewEncoder(w)
+	// if err := enc.Encode(pageSummary); err != nil {
+	// 	fmt.Printf("error fetching HTML %v", err)
+	// }
+	buffer, err := json.Marshal(pageSummary)
 	defer html.Close()
+	w.Write(buffer)
 }
 
 //fetchHTML fetches `pageURL` and returns the body stream or an error.
@@ -123,16 +125,16 @@ func fetchHTML(pageURL string) (io.ReadCloser, error) {
 }
 
 // convert relative path to absolute path
-func makeAbsPath(path, pageURL string) string {
+func makeAbsPath(path, pageURL string) (string, error) {
 	parsedURL, err := url.Parse(path)
 	if err != nil {
-		fmt.Errorf("error parsing path: %v\n", err)
+		return path, fmt.Errorf("error parsing path: %v\n", err)
 	}
 	base, err := url.Parse(pageURL)
 	if err != nil {
-		fmt.Errorf("error parsing URL: %v\n", err)
+		return path, fmt.Errorf("error parsing URL: %v\n", err)
 	}
-	return base.ResolveReference(parsedURL).String()
+	return base.ResolveReference(parsedURL).String(), nil
 }
 
 // //extractSummary tokenizes the `htmlStream` and populates a PageSummary
@@ -200,17 +202,25 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 									image := new(PreviewImage)
 									images = append(images, image)
 									ps.Images = images
-									abURL := conVal
-									if path.IsAbs(abURL) {
-										abURL = makeAbsPath(conVal, pageURL)
+									URL := conVal
+									if path.IsAbs(URL) {
+										abURL, err := makeAbsPath(conVal, pageURL)
+										if err != nil {
+											return nil, fmt.Errorf("cannot convert relative absolute path")
+										}
+										URL = abURL
 									}
-									images[len(images)-1].URL = abURL
+									images[len(images)-1].URL = URL
 								case "og:image:secure_url":
-									abURL := conVal
-									if path.IsAbs(abURL) {
-										abURL = makeAbsPath(conVal, pageURL)
+									URL := conVal
+									if path.IsAbs(URL) {
+										abURL, err := makeAbsPath(conVal, pageURL)
+										if err != nil {
+											return nil, fmt.Errorf("cannot convert relative absolute path")
+										}
+										URL = abURL
 									}
-									images[len(images)-1].SecureURL = abURL
+									images[len(images)-1].SecureURL = URL
 								case "og:image:type":
 									images[len(images)-1].Type = conVal
 								case "og:image:height":
@@ -254,7 +264,11 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 							case "href":
 								abURL := val
 								if path.IsAbs(abURL) {
-									abURL = makeAbsPath(val, pageURL)
+									ab, err := makeAbsPath(val, pageURL)
+									if err != nil {
+										return nil, fmt.Errorf("cannot convert relative absolute path")
+									}
+									abURL = ab
 								}
 								icon.URL = abURL
 							case "sizes":

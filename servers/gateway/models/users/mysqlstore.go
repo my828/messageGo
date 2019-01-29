@@ -16,6 +16,24 @@ func NewSQLStore(db *sql.DB) *SQLStore {
 		db,
 	}
 }
+func (sqls *SQLStore) RefactorGetBy(input string, what string) (*User, error) {
+	rows, err := sqls.Db.Query("select * from users where "+what+"=?", input)
+	if err != nil {
+		return &User{}, fmt.Errorf("Error getting data by id: %v", err)
+	}
+	defer rows.Close()
+	user := &User{}
+	for rows.Next() {
+		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
+			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
+			return &User{}, fmt.Errorf("Error getting data")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return &User{}, fmt.Errorf("error getting next row: %v\n", err)
+	}
+	return user, nil
+}
 
 //GetByID returns the User with the given ID
 func (sqls *SQLStore) GetByID(id int64) (*User, error) {
@@ -39,43 +57,12 @@ func (sqls *SQLStore) GetByID(id int64) (*User, error) {
 
 //GetByEmail returns the User with the given email
 func (sqls *SQLStore) GetByEmail(email string) (*User, error) {
-	rows, err := sqls.Db.Query("select * from users where email=?", email)
-	if err != nil {
-		return &User{}, fmt.Errorf("Error getting data by email")
-	}
-	defer rows.Close()
-	user := &User{}
-	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
-			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
-			return &User{}, fmt.Errorf("Error getting data")
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return &User{}, fmt.Errorf("error getting next row: %v\n", err)
-	}
-	return user, nil
+	return sqls.RefactorGetBy(email, "email")
 }
 
 //GetByUserName returns the User with the given Username
 func (sqls *SQLStore) GetByUserName(username string) (*User, error) {
-	rows, err := sqls.Db.Query("select * from users where user_name=?", username)
-	if err != nil {
-		return &User{}, fmt.Errorf("Error getting data by user name")
-	}
-
-	defer rows.Close()
-	user := &User{}
-	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
-			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
-			return &User{}, fmt.Errorf("Error getting data")
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return &User{}, fmt.Errorf("error getting next row: %v\n", err)
-	}
-	return user, nil
+	return sqls.RefactorGetBy(username, "user_name")
 }
 
 //Insert inserts the user into the database, and returns
@@ -112,6 +99,7 @@ func (sqls *SQLStore) Update(id int64, updates *Updates) (*User, error) {
 	if err != nil {
 		return &User{}, fmt.Errorf("error updating database %v", err)
 	}
+
 	return sqls.GetByID(id)
 }
 

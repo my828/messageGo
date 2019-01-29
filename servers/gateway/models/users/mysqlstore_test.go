@@ -103,51 +103,29 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 	}
 	store := NewSQLStore(db)
 
-	// Create a row with the appropriate fields in your SQL database
-	// Add the actual values to the row
 	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
 	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
-	// Expecting a successful "query"
-	// This tells our db to expect this query (id) as well as supply a certain response (row)
-	// REMINDER: Since sqlmock requires a regex string, in order for `?` to be interpreted, you'll
-	// have to wrap it within a `regexp.QuoteMeta`. Be mindful that you will need to do this EVERY TIME you're
-	// using any reserved metacharacters in regex.
 	mock.ExpectQuery(regexp.QuoteMeta(GETEMAIL)).
 		WithArgs(expectedUser.Email).WillReturnRows(row)
 
-	// Since we know our query is successful, we want to test whether there happens to be
-	// any expected error that may occur.
 	user, err := store.GetByEmail(expectedUser.Email)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Again, since we are assuming that our query is successful, we can test for when our
-	// function doesn't work as expected.
 	if err == nil && !reflect.DeepEqual(user, expectedUser) {
 		t.Errorf("User queried does not match expected user")
 	}
 
-	// Expecting a unsuccessful "query"
-	// Attempting to search by an id that doesn't exist. This would result in a
-	// sql.ErrNoRows error
-	// REMINDER: Using a constant makes your code much clear, and is highly recommended.
 	mock.ExpectQuery(regexp.QuoteMeta(GETEMAIL)).
 		WithArgs("").WillReturnError(sql.ErrNoRows)
 
-	// Since we are expecting an error here, we create a condition opposing that to see
-	// if our GetById is working as expected
 	if _, err = store.GetByEmail(""); err == nil {
 		t.Errorf("Expected error: %v, but recieved nil", sql.ErrNoRows)
 	}
 
-	// Attempting to trigger a DBMS querying error
 	queryingErr := fmt.Errorf("DBMS error when querying")
-
-	if _, err = store.GetByEmail(expectedUser.Email); err == nil {
-		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
-	}
 
 	wrongRow := sqlmock.NewRows([]string{"id", "email", "first_name", "last_name", "photo_url"})
 	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
@@ -157,7 +135,7 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error: %v but recieved nil", queryingErr)
 	}
-	// This attempts to check if there are any expectations that we haven't met
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
 	}
@@ -173,51 +151,30 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	// Create a row with the appropriate fields in your SQL database
-	// Add the actual values to the row
+
 	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
 	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
-	// Expecting a successful "query"
-	// This tells our db to expect this query (id) as well as supply a certain response (row)
-	// REMINDER: Since sqlmock requires a regex string, in order for `?` to be interpreted, you'll
-	// have to wrap it within a `regexp.QuoteMeta`. Be mindful that you will need to do this EVERY TIME you're
-	// using any reserved metacharacters in regex.
 	mock.ExpectQuery(regexp.QuoteMeta(GETUSER)).
 		WithArgs(expectedUser.UserName).WillReturnRows(row)
 
-	// Since we know our query is successful, we want to test whether there happens to be
-	// any expected error that may occur.
 	user, err := store.GetByUserName(expectedUser.UserName)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Again, since we are assuming that our query is successful, we can test for when our
-	// function doesn't work as expected.
 	if err == nil && !reflect.DeepEqual(user, expectedUser) {
 		t.Errorf("User queried does not match expected user")
 	}
 
-	// Expecting a unsuccessful "query"
-	// Attempting to search by an id that doesn't exist. This would result in a
-	// sql.ErrNoRows error
-	// REMINDER: Using a constant makes your code much clear, and is highly recommended.
 	mock.ExpectQuery(regexp.QuoteMeta(GETUSER)).
 		WithArgs("").WillReturnError(sql.ErrNoRows)
 
-	// Since we are expecting an error here, we create a condition opposing that to see
-	// if our GetById is working as expected
 	if _, err = store.GetByUserName(""); err == nil {
 		t.Errorf("Expected error: %v, but recieved nil", sql.ErrNoRows)
 	}
 
-	// Attempting to trigger a DBMS querying error
 	queryingErr := fmt.Errorf("DBMS error when querying")
-
-	if _, err = store.GetByEmail(expectedUser.Email); err == nil {
-		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
-	}
 
 	wrongRow := sqlmock.NewRows([]string{"id", "email", "user_name", "first_name", "last_name", "photo_url"})
 	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
@@ -227,7 +184,7 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error: %v but recieved nil", queryingErr)
 	}
-	// This attempts to check if there are any expectations that we haven't met
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
 	}
@@ -296,9 +253,6 @@ func TestMySQLStore_Update(t *testing.T) {
 		"Hanks",
 	}
 
-	// mock.ExpectExec(regexp.QuoteMeta("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")).
-	// 	WithArgs(inputUser.ID, inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
-	// 	WillReturnResult(sqlmock.NewResult(2, 1))
 	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
 	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 

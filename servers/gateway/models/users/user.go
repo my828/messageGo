@@ -1,5 +1,15 @@
 package users
 
+import (
+	"crypto/md5"
+	"fmt"
+	"io"
+	"net/mail"
+	"strings"
+
+	"golang.org/x/crypto/bcrypt"
+)
+
 //gravatarBasePhotoURL is the base URL for Gravatar image requests.
 //See https://id.gravatar.com/site/implement/images/ for details
 const gravatarBasePhotoURL = "https://www.gravatar.com/avatar/"
@@ -50,7 +60,19 @@ func (nu *NewUser) Validate() error {
 	//- UserName must be non-zero length and may not contain spaces
 	//use fmt.Errorf() to generate appropriate error messages if
 	//the new user doesn't pass one of the validation rules
-
+	err := nu.ParseAddress(nu.Email)
+	if err != nil {
+		return fmt.Errorf("Invalid email address")
+	}
+	if len(nu.Password) < 6 {
+		return fmt.Errorf("Password needs to be at least 6 characters")
+	}
+	if nu.Password != nu.PasswordConf {
+		return fmt.Errorf("Passwords does not match")
+	}
+	if len(nu.UserName) == 0 || strings.Contains(nu.UserName, " ") {
+		return fmt.Errorf("User name need to be enter and cannot contain space")
+	}
 	return nil
 }
 
@@ -71,8 +93,28 @@ func (nu *NewUser) ToUser() (*User, error) {
 
 	//TODO: also call .SetPassword() to set the PassHash
 	//field of the User to a hash of the NewUser.Password
-
-	return nil, nil
+	if err := nu.Validate(); err != nil {
+		return &User{}, err
+	}
+	//get hash
+	h := md5.New()
+	if _, err := io.WriteString(h, nu.Email); err != nil {
+		return &User{}, err
+	}
+	user := &User{
+		0,
+		nu.Email,
+		[]byte(""),
+		nu.UserName,
+		nu.FirstName,
+		nu.LastName,
+		gravatarBasePhotoURL + string(h.Sum(nil)),
+	}
+	user.SetPassword(nu.Password)
+	if err := user.Authenticate(nu.Password); err != nil {
+		return &User{}, err
+	}
+	return user, nil
 }
 
 //FullName returns the user's full name, in the form:
@@ -82,15 +124,25 @@ func (nu *NewUser) ToUser() (*User, error) {
 //this returns an empty string
 func (u *User) FullName() string {
 	//TODO: implement according to comment above
-
-	return ""
+	if u.FirstName == "" && u.LastName == "" {
+		return ""
+	} else if u.FirstName == "" {
+		return u.LastName
+	} else if u.LastName == "" {
+		return u.FirstName
+	}
+	return u.FirstName + " " + u.LastName
 }
 
 //SetPassword hashes the password and stores it in the PassHash field
 func (u *User) SetPassword(password string) error {
 	//TODO: use the bcrypt package to generate a new hash of the password
 	//https://godoc.org/golang.org/x/crypto/bcrypt
-
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		return fmt.Errorf("Error hashing password %v", err)
+	}
+	u.PassHash = hash
 	return nil
 }
 
@@ -100,8 +152,11 @@ func (u *User) Authenticate(password string) error {
 	//TODO: use the bcrypt package to compare the supplied
 	//password with the stored PassHash
 	//https://godoc.org/golang.org/x/crypto/bcrypt
-
-	return nil
+	err := bcrypt.CompareHashAndPassword(u.PassHash, []byte(password))
+	// if err != nil {
+	// 	return err
+	// }
+	return err
 }
 
 //ApplyUpdates applies the updates to the user. An error
@@ -109,6 +164,19 @@ func (u *User) Authenticate(password string) error {
 func (u *User) ApplyUpdates(updates *Updates) error {
 	//TODO: set the fields of `u` to the values of the related
 	//field in the `updates` struct
+	if updates == nil {
+		return fmt.Errorf("Invalid update")
+	}
+	u.FirstName = updates.FirstName
+	u.LastName = updates.LastName
+	return nil
+}
 
+func (nu *NewUser) ParseAddress(email string) error {
+	add, err := mail.ParseAddress(email)
+	if err != nil {
+		return err
+	}
+	nu.Email = strings.ToLower(add.Address)
 	return nil
 }

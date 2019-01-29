@@ -21,6 +21,7 @@ func main() {
 	  the root handler. Use log.Fatal() to report any errors
 	  that occur when trying to start the web server.
 	*/
+
 	addr := os.Getenv("ADDR")
 	if len(addr) == 0 {
 		addr = ":443"

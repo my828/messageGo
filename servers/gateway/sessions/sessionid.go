@@ -1,8 +1,13 @@
 package sessions
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"os"
 )
 
 //InvalidSessionID represents an empty, invalid session ID
@@ -35,7 +40,9 @@ var ErrInvalidID = errors.New("Invalid Session ID")
 func NewSessionID(signingKey string) (SessionID, error) {
 	//TODO: if `signingKey` is zero-length, return InvalidSessionID
 	//and an error indicating that it may not be empty
-
+	if len(signingKey) == 0 {
+		return InvalidSessionID, fmt.Errorf("Invalid Session ID")
+	}
 	//TODO: Generate a new digitally-signed SessionID by doing the following:
 	//- create a byte slice where the first `idLength` of bytes
 	//  are cryptographically random bytes for the new session ID,
@@ -44,9 +51,18 @@ func NewSessionID(signingKey string) (SessionID, error) {
 	//- encode that byte slice using base64 URL Encoding and return
 	//  the result as a SessionID type
 
-	//the following return statement is just a placeholder
-	//remove it when implementing the function
-	return InvalidSessionID, nil
+	salt := make([]byte, idLength)
+	_, err := rand.Read(salt)
+	if err != nil {
+		fmt.Printf("error generating salt: %v\n", err)
+		os.Exit(1)
+	}
+	//create a new HMAC hasher
+	hash := hmac.New(sha256.New, []byte(signingKey))
+	hash.Write(salt)
+	signature := hash.Sum(nil)
+	sessionSlice := append(salt, signature...)
+	return SessionID(base64.URLEncoding.EncodeToString(sessionSlice)), nil
 }
 
 //ValidateID validates the string in the `id` parameter
@@ -60,7 +76,16 @@ func ValidateID(id string, signingKey string) (SessionID, error) {
 	//HMAC hash stored in the remaining bytes. If they match,
 	//return the entire `id` parameter as a SessionID type.
 	//If not, return InvalidSessionID and ErrInvalidID.
-
+	decode, err := base64.URLEncoding.DecodeString(id)
+	if err != nil {
+		return InvalidSessionID, fmt.Errorf("Invalid id")
+	}
+	hash := hmac.New(sha256.New, []byte(signingKey))
+	hash.Write([]byte(decode[:idLength]))
+	signature := hash.Sum(nil)
+	if hmac.Equal(decode[idLength:], signature) {
+		return SessionID(id), nil
+	}
 	return InvalidSessionID, ErrInvalidID
 }
 

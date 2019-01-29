@@ -24,19 +24,11 @@ func TestMySQLStore_GetByID(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	newUser := &NewUser{
-		"min@example.com",
-		"password",
-		"password",
-		"minyang",
-		"Min",
-		"Yang",
+	expectedUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	expectedUser, err := newUser.ToUser()
-	if err != nil {
-		t.Fatalf("error generating new user %v", err)
-	}
 
 	// Create a row with the appropriate fields in your SQL database
 	// Add the actual values to the row
@@ -96,19 +88,11 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	newUser := &NewUser{
-		"min@example.com",
-		"password",
-		"password",
-		"minyang",
-		"Min",
-		"Yang",
+	expectedUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	expectedUser, err := newUser.ToUser()
-	if err != nil {
-		t.Fatalf("error generating new user %v", err)
-	}
 
 	// Create a row with the appropriate fields in your SQL database
 	// Add the actual values to the row
@@ -167,20 +151,11 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	newUser := &NewUser{
-		"min@example.com",
-		"password",
-		"password",
-		"minyang",
-		"Min",
-		"Yang",
+	expectedUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	expectedUser, err := newUser.ToUser()
-	if err != nil {
-		t.Fatalf("error generating new user %v", err)
-	}
-
 	// Create a row with the appropriate fields in your SQL database
 	// Add the actual values to the row
 	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
@@ -239,19 +214,11 @@ func TestMySQLStore_Insert(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	newUser := &NewUser{
-		"min@example.com",
-		"password",
-		"password",
-		"minyang",
-		"Min",
-		"Yang",
+	inputUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	inputUser, err := newUser.ToUser()
-	if err != nil {
-		t.Fatalf("error generating new user %v", err)
-	}
 	// This tells our db to expect an insert query with certain arguments with a certain
 	// return result
 	mock.ExpectExec(regexp.QuoteMeta("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")).
@@ -293,57 +260,76 @@ func TestMySQLStore_Update(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	newUser := &NewUser{
-		"min@example.com",
-		"password",
-		"password",
-		"minyang",
-		"Min",
-		"Yang",
+	expectedUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
 	}
 	store := NewSQLStore(db)
-	inputUser, err := newUser.ToUser()
-	if err != nil {
-		t.Fatalf("error generating new user %v", err)
-	}
+
 	update := &Updates{
 		"Tom",
 		"Hanks",
 	}
 
-	mock.ExpectExec(regexp.QuoteMeta("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")).
-		WithArgs(inputUser.ID, inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
-		WillReturnResult(sqlmock.NewResult(2, 1))
-	user, err := store.Insert(inputUser)
+	// mock.ExpectExec(regexp.QuoteMeta("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")).
+	// 	WithArgs(inputUser.ID, inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
+	// 	WillReturnResult(sqlmock.NewResult(2, 1))
+	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
+	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
-	mock.ExpectExec(regexp.QuoteMeta("update users set first_name=?, last_name=? where id=?")).
-		WithArgs(update.FirstName, update.LastName, inputUser.ID).
+	mock.ExpectExec(regexp.QuoteMeta(UPDATESTATEMENT)).
+		WithArgs(update.FirstName, update.LastName, expectedUser.ID).
 		WillReturnResult(sqlmock.NewResult(2, 1))
-	updatedUser, err := store.Update(user.ID, update)
 
-	inputUser.ApplyUpdates(update)
-	inputUser.ID = user.ID
+	mock.ExpectQuery(regexp.QuoteMeta("select * from users where id=?")).
+		WithArgs(expectedUser.ID).
+		WillReturnRows(row)
+
+	updatedUser, err := store.Update(expectedUser.ID, update)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-
-	if err == nil && !reflect.DeepEqual(inputUser, updatedUser) {
+	if err == nil && !reflect.DeepEqual(expectedUser, updatedUser) {
 		t.Errorf("User returned does not match input user")
 	}
 
-	// invalidUpdate := &Updates{
+	noUpdate := &Updates{
+		"Min",
+		"Yang",
+	}
 
-	// }
-
-	// insertErr := fmt.Errorf("Error executing INSERT operation")
-
-	// if _, err = store.Update(inputUser.ID, update); err == nil {
-	// 	t.Errorf("Expected error: %v but recieved nil", insertErr)
-	// }
+	insertErr := fmt.Errorf("Error executing UPDATE operation")
+	mock.ExpectExec(regexp.QuoteMeta(UPDATESTATEMENT)).
+		WithArgs(noUpdate.FirstName, noUpdate.LastName, updatedUser.ID).
+		WillReturnResult(sqlmock.NewResult(2, 1))
+	if _, err = store.Update(updatedUser.ID, noUpdate); err == nil {
+		t.Errorf("Expected error: %v but recieved nil", insertErr)
+	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
 	}
 }
 func TestMySQLStore_Delete(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+	expectedUser := &User{
+		FirstName: "Min",
+		LastName:  "Yang",
+	}
+	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
+	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+
+	store := NewSQLStore(db)
+
+	mock.ExpectExec(regexp.QuoteMeta(DELETESTATEMENT)).
+		WithArgs(expectedUser.ID).
+		WillReturnResult(sqlmock.NewResult(2, 1))
+	err = store.Delete(expectedUser.ID)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }

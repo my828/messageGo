@@ -90,26 +90,18 @@ func (sqls *SQLStore) Insert(user *User) (*User, error) {
 	insq := "insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)"
 	res, err := sqls.Db.Exec(insq, user.ID, user.Email, user.PassHash, user.UserName,
 		user.FirstName, user.LastName, user.PhotoURL)
-	u := &User{
-		user.ID,
-		user.Email,
-		user.PassHash,
-		user.UserName,
-		user.FirstName,
-		user.LastName,
-		user.PhotoURL,
-	}
+
 	if err != nil {
 		return &User{}, fmt.Errorf("error inserting new row: %v\n", err)
 	}
 	//get the auto-assigned ID for the new row
 	id, err := res.LastInsertId()
 
-	u.ID = id
+	user.ID = id
 	if err != nil {
 		return &User{}, fmt.Errorf("error getting new ID: %v\n", id)
 	}
-	return u, nil
+	return user, nil
 }
 
 //Update applies UserUpdates to the given user ID
@@ -125,11 +117,8 @@ func (sqls *SQLStore) Update(id int64, updates *Updates) (*User, error) {
 
 //Delete deletes the user with the given ID
 func (sqls *SQLStore) Delete(id int64) error {
-	stmt, err := sqls.Db.Prepare("delete from users where id=?")
-	if err != nil {
-		return fmt.Errorf("error preparing database %v", err)
-	}
-	_, err = stmt.Exec(id)
+	insq := "delete from users where id=?"
+	_, err := sqls.Db.Exec(insq, id)
 	if err != nil {
 		return fmt.Errorf("error deleteing from database %v", err)
 	}

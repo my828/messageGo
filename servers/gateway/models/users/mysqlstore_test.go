@@ -76,6 +76,15 @@ func TestMySQLStore_GetByID(t *testing.T) {
 		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
 	}
 
+	wrongRow := sqlmock.NewRows([]string{"id", "pass_hash", "first_name", "last_name", "photo_url"})
+	wrongRow.AddRow(expectedUser.ID, expectedUser.PassHash, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	mock.ExpectQuery(regexp.QuoteMeta(GETID)).
+		WithArgs(expectedUser.ID).WillReturnRows(wrongRow)
+	_, err = store.GetByID(expectedUser.ID)
+	if err == nil {
+		t.Errorf("Expected error: %v but recieved nil", queryingErr)
+	}
+
 	// This attempts to check if there are any expectations that we haven't met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
@@ -140,6 +149,14 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
 	}
 
+	wrongRow := sqlmock.NewRows([]string{"id", "email", "first_name", "last_name", "photo_url"})
+	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	mock.ExpectQuery(regexp.QuoteMeta(GETEMAIL)).
+		WithArgs(expectedUser.Email).WillReturnRows(wrongRow)
+	_, err = store.GetByEmail(expectedUser.Email)
+	if err == nil {
+		t.Errorf("Expected error: %v but recieved nil", queryingErr)
+	}
 	// This attempts to check if there are any expectations that we haven't met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
@@ -202,6 +219,14 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
 	}
 
+	wrongRow := sqlmock.NewRows([]string{"id", "email", "user_name", "first_name", "last_name", "photo_url"})
+	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	mock.ExpectQuery(regexp.QuoteMeta(GETUSER)).
+		WithArgs(expectedUser.UserName).WillReturnRows(wrongRow)
+	_, err = store.GetByUserName(expectedUser.UserName)
+	if err == nil {
+		t.Errorf("Expected error: %v but recieved nil", queryingErr)
+	}
 	// This attempts to check if there are any expectations that we haven't met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet sqlmock expectations: %v", err)
@@ -298,12 +323,17 @@ func TestMySQLStore_Update(t *testing.T) {
 		"Yang",
 	}
 
-	insertErr := fmt.Errorf("Error executing UPDATE operation")
+	updateErr := fmt.Errorf("Error executing UPDATE operation")
 	mock.ExpectExec(regexp.QuoteMeta(UPDATESTATEMENT)).
 		WithArgs(noUpdate.FirstName, noUpdate.LastName, updatedUser.ID).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 	if _, err = store.Update(updatedUser.ID, noUpdate); err == nil {
-		t.Errorf("Expected error: %v but recieved nil", insertErr)
+		t.Errorf("Expected error: %v but recieved nil", updateErr)
+	}
+	invalidUpdate := &Updates{}
+
+	if _, err = store.Update(updatedUser.ID, invalidUpdate); err == nil {
+		t.Errorf("Expected error: %v but recieved nil", updateErr)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -331,5 +361,10 @@ func TestMySQLStore_Delete(t *testing.T) {
 	err = store.Delete(expectedUser.ID)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	deleteErr := fmt.Errorf("Error executing DELETE operation")
+
+	if err = store.Delete(-1); err == nil {
+		t.Errorf("Expected error: %v but recieved nil", deleteErr)
 	}
 }

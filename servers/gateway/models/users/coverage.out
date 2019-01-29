@@ -6,7 +6,7 @@ assignments-my828/servers/gateway/models/users/mysqlstore.go:34.2,34.35 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:37.2,37.18 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:23.16,25.3 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:28.18,30.65 1 1
-assignments-my828/servers/gateway/models/users/mysqlstore.go:30.65,32.4 1 0
+assignments-my828/servers/gateway/models/users/mysqlstore.go:30.65,32.4 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:34.35,36.3 1 0
 assignments-my828/servers/gateway/models/users/mysqlstore.go:41.63,43.16 2 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:46.2,48.18 3 1
@@ -14,7 +14,7 @@ assignments-my828/servers/gateway/models/users/mysqlstore.go:54.2,54.35 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:57.2,57.18 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:43.16,45.3 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:48.18,50.65 1 1
-assignments-my828/servers/gateway/models/users/mysqlstore.go:50.65,52.4 1 0
+assignments-my828/servers/gateway/models/users/mysqlstore.go:50.65,52.4 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:54.35,56.3 1 0
 assignments-my828/servers/gateway/models/users/mysqlstore.go:61.69,63.16 2 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:67.2,69.18 3 1
@@ -22,7 +22,7 @@ assignments-my828/servers/gateway/models/users/mysqlstore.go:75.2,75.35 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:78.2,78.18 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:63.16,65.3 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:69.18,71.65 1 1
-assignments-my828/servers/gateway/models/users/mysqlstore.go:71.65,73.4 1 0
+assignments-my828/servers/gateway/models/users/mysqlstore.go:71.65,73.4 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:75.35,77.3 1 0
 assignments-my828/servers/gateway/models/users/mysqlstore.go:83.57,94.16 3 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:98.2,101.16 3 1
@@ -31,10 +31,10 @@ assignments-my828/servers/gateway/models/users/mysqlstore.go:94.16,96.3 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:101.16,103.3 1 0
 assignments-my828/servers/gateway/models/users/mysqlstore.go:109.73,112.16 3 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:115.2,115.25 1 1
-assignments-my828/servers/gateway/models/users/mysqlstore.go:112.16,114.3 1 0
+assignments-my828/servers/gateway/models/users/mysqlstore.go:112.16,114.3 1 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:119.46,122.16 3 1
 assignments-my828/servers/gateway/models/users/mysqlstore.go:125.2,125.12 1 1
-assignments-my828/servers/gateway/models/users/mysqlstore.go:122.16,124.3 1 0
+assignments-my828/servers/gateway/models/users/mysqlstore.go:122.16,124.3 1 1
 assignments-my828/servers/gateway/models/users/user.go:55.37,64.16 2 1
 assignments-my828/servers/gateway/models/users/user.go:67.2,67.26 1 1
 assignments-my828/servers/gateway/models/users/user.go:70.2,70.36 1 1

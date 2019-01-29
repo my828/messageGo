@@ -3,6 +3,7 @@ package users
 import (
 	"crypto/md5"
 	"io"
+	"log"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestToUser(t *testing.T) {
 		{
 			"Invalid email",
 			&NewUser{
-				".min@example.com",
+				"<.min@example.com>",
 				"password",
 				"password",
 				"minyang",
@@ -29,7 +30,7 @@ func TestToUser(t *testing.T) {
 		{
 			"Invalid password",
 			&NewUser{
-				"min@example.com",
+				"<min@example.com>",
 				"pass",
 				"pass",
 				"minyang",
@@ -41,7 +42,7 @@ func TestToUser(t *testing.T) {
 		{
 			"Invalid password confirmation",
 			&NewUser{
-				"min@example.com",
+				"<min@example.com>",
 				"password",
 				"passworD",
 				"minyang",
@@ -53,7 +54,7 @@ func TestToUser(t *testing.T) {
 		{
 			"Invalid user name",
 			&NewUser{
-				"min@example.com",
+				"<min@example.com>",
 				"password",
 				"password",
 				"",
@@ -65,7 +66,7 @@ func TestToUser(t *testing.T) {
 		{
 			"Invalid user name",
 			&NewUser{
-				"min@example.com",
+				"<min@example.com>",
 				"password",
 				"password",
 				"min yang",
@@ -100,10 +101,11 @@ func TestToUser(t *testing.T) {
 			t.Errorf("error: %v", err)
 		}
 
-		if user.PhotoURL != gravatarBasePhotoURL+string(h.Sum(nil)) {
+		if !c.expectedError && user.PhotoURL != gravatarBasePhotoURL+string(h.Sum(nil)) {
+			log.Printf("user photo: %s", user.Email)
+			log.Printf("Other photo: %s", (gravatarBasePhotoURL + string(h.Sum(nil))))
 			t.Errorf("Incorrect photo url")
 		}
-
 		if !c.expectedError && user.Email != "yang@example.com" {
 			t.Errorf("case %s: email not parsed correctly", c.name)
 		}

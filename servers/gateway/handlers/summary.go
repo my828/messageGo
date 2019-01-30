@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -69,23 +68,28 @@ func SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	https://golang.org/pkg/encoding/json/#NewEncoder
 	*/
 	w.Header().Add(headerCORS, corsAnyOrigin)
-	w.Header().Add("Content-Type", "application/json")
 	URL := r.FormValue("url")
 	if URL == "" {
 		http.Error(w, fmt.Sprintf("Bad Request! Try something else! %v", http.StatusBadRequest), 400)
+		return
 	}
 	html, err := fetchHTML(URL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Bad Request! Try something else! %v", err), 400)
+		return
 	}
 
 	pageSummary, err := extractSummary(URL, html)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Bad Request! %v", err), 500)
+		return
 	}
+
+	w.Header().Add("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(pageSummary); err != nil {
-		fmt.Printf("error fetching HTML %v", err)
+		http.Error(w, fmt.Sprintf("error fetching HTML %v", err), 500)
+		return
 	}
 	buffer, err := json.Marshal(pageSummary)
 	defer html.Close()
@@ -125,16 +129,19 @@ func fetchHTML(pageURL string) (io.ReadCloser, error) {
 }
 
 // convert relative path to absolute path
-func makeAbsPath(path, pageURL string) (string, error) {
-	parsedURL, err := url.Parse(path)
-	if err != nil {
-		return path, fmt.Errorf("error parsing path: %v\n", err)
+func makeAbsPath(val, pageURL string) (string, error) {
+	if path.IsAbs(val) {
+		parsedURL, err := url.Parse(val)
+		if err != nil {
+			return "", fmt.Errorf("error parsing path: %v\n", err)
+		}
+		base, err := url.Parse(pageURL)
+		if err != nil {
+			return "", fmt.Errorf("error parsing URL: %v\n", err)
+		}
+		return base.ResolveReference(parsedURL).String(), nil
 	}
-	base, err := url.Parse(pageURL)
-	if err != nil {
-		return path, fmt.Errorf("error parsing URL: %v\n", err)
-	}
-	return base.ResolveReference(parsedURL).String(), nil
+	return val, nil
 }
 
 // //extractSummary tokenizes the `htmlStream` and populates a PageSummary
@@ -167,7 +174,7 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 			if err == io.EOF || tag == "/head" {
 				break
 			}
-			log.Fatalf("error tokenizing HTML: %v", tokenizer.Err())
+			return nil, fmt.Errorf("error tokenizing HTML: %v", tokenizer.Err())
 		}
 
 		if tokenType == html.StartTagToken || tokenType == html.SelfClosingTagToken {
@@ -177,11 +184,8 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 					proVal := attr.Val
 					if proKey == "property" || proKey == "name" {
 						for _, attr := range token.Attr {
-							//ps.Type = "this is test"
-							//fmt.Println(ps.Type)
 							conKey := attr.Key
 							conVal := attr.Val
-							//fmt.Println("I am in content: " + conKey)
 							if conKey == "content" {
 								switch proVal {
 								case "og:type":
@@ -202,23 +206,15 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 									image := new(PreviewImage)
 									images = append(images, image)
 									ps.Images = images
-									URL := conVal
-									if path.IsAbs(URL) {
-										abURL, err := makeAbsPath(conVal, pageURL)
-										if err != nil {
-											return nil, fmt.Errorf("cannot convert relative absolute path")
-										}
-										URL = abURL
+									URL, err := makeAbsPath(conVal, pageURL)
+									if err != nil {
+										return nil, err
 									}
 									images[len(images)-1].URL = URL
 								case "og:image:secure_url":
-									URL := conVal
-									if path.IsAbs(URL) {
-										abURL, err := makeAbsPath(conVal, pageURL)
-										if err != nil {
-											return nil, fmt.Errorf("cannot convert relative absolute path")
-										}
-										URL = abURL
+									URL, err := makeAbsPath(conVal, pageURL)
+									if err != nil {
+										return nil, err
 									}
 									images[len(images)-1].SecureURL = URL
 								case "og:image:type":
@@ -238,20 +234,11 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 								case "og:image:alt":
 									images[len(images)-1].Alt = conVal
 								case "author":
-									for _, attr := range token.Attr {
-										if attr.Key == "content" {
-											ps.Author = attr.Val
-											break
-										}
-									}
+									ps.Author = attr.Val
 								case "keywords":
-									for _, attr := range token.Attr {
-										if attr.Key == "content" {
-											keywords := strings.Split(attr.Val, ",")
-											for _, keyword := range keywords {
-												ps.Keywords = append(ps.Keywords, strings.Trim(string(keyword), " "))
-											}
-										}
+									keywords := strings.Split(conVal, ",")
+									for _, keyword := range keywords {
+										ps.Keywords = append(ps.Keywords, strings.Trim(string(keyword), " "))
 									}
 								}
 							}
@@ -262,15 +249,11 @@ func extractSummary(pageURL string, htmlStream io.ReadCloser) (*PageSummary, err
 							val := attr.Val
 							switch attr.Key {
 							case "href":
-								abURL := val
-								if path.IsAbs(abURL) {
-									ab, err := makeAbsPath(val, pageURL)
-									if err != nil {
-										return nil, fmt.Errorf("cannot convert relative absolute path")
-									}
-									abURL = ab
+								URL, err := makeAbsPath(val, pageURL)
+								if err != nil {
+									return nil, err
 								}
-								icon.URL = abURL
+								icon.URL = URL
 							case "sizes":
 								if val != "any" {
 									size := strings.Split(val, "x")

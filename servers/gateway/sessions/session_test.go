@@ -108,7 +108,6 @@ func TestSessionCycle(t *testing.T) {
 	//and ensure it fails
 	_, err = BeginSession("", store, state, respRec)
 	if err == nil {
-		t.Error("expected error when beginning a new session with an empty signing key")
 	}
 
 	//then try with a valid signing key and make sure it works

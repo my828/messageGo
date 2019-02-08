@@ -13,9 +13,9 @@ import (
 
 const GETID = "select * from users where id=?"
 const GETEMAIL = "select * from users where email=?"
-const GETUSER = "select * from users where user_name=?"
-const INSERTSTATEMENT = "insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)"
-const UPDATESTATEMENT = "update users set first_name=?, last_name=? where id=?"
+const GETUSER = "select * from users where userName=?"
+const INSERTSTATEMENT = "insert into users(email, pass_hash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
+const UPDATESTATEMENT = "update users set firstName=?, lastName=? where id=?"
 const DELETESTATEMENT = "delete from users where id=?"
 
 func TestMySQLStore_GetByID(t *testing.T) {
@@ -32,8 +32,8 @@ func TestMySQLStore_GetByID(t *testing.T) {
 
 	// Create a row with the appropriate fields in your SQL database
 	// Add the actual values to the row
-	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
-	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	row := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	row.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
 	// Expecting a successful "query"
 	// This tells our db to expect this query (id) as well as supply a certain response (row)
@@ -76,8 +76,8 @@ func TestMySQLStore_GetByID(t *testing.T) {
 		t.Errorf("Expected error: %v, but recieved nil", queryingErr)
 	}
 
-	wrongRow := sqlmock.NewRows([]string{"id", "pass_hash", "first_name", "last_name", "photo_url"})
-	wrongRow.AddRow(expectedUser.ID, expectedUser.PassHash, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	wrongRow := sqlmock.NewRows([]string{"passHash", "firstName", "lastName", "photoUrl"})
+	wrongRow.AddRow(expectedUser.PassHash, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 	mock.ExpectQuery(regexp.QuoteMeta(GETID)).
 		WithArgs(expectedUser.ID).WillReturnRows(wrongRow)
 	_, err = store.GetByID(expectedUser.ID)
@@ -103,8 +103,8 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 	}
 	store := NewSQLStore(db)
 
-	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
-	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	row := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	row.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
 	mock.ExpectQuery(regexp.QuoteMeta(GETEMAIL)).
 		WithArgs(expectedUser.Email).WillReturnRows(row)
@@ -127,8 +127,8 @@ func TestMySQLStore_GetByEmail(t *testing.T) {
 
 	queryingErr := fmt.Errorf("DBMS error when querying")
 
-	wrongRow := sqlmock.NewRows([]string{"id", "email", "first_name", "last_name", "photo_url"})
-	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	wrongRow := sqlmock.NewRows([]string{"email", "firstName", "lastName", "photoUrl"})
+	wrongRow.AddRow(expectedUser.Email, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 	mock.ExpectQuery(regexp.QuoteMeta(GETEMAIL)).
 		WithArgs(expectedUser.Email).WillReturnRows(wrongRow)
 	_, err = store.GetByEmail(expectedUser.Email)
@@ -152,8 +152,8 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 	}
 	store := NewSQLStore(db)
 
-	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
-	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	row := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	row.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
 	mock.ExpectQuery(regexp.QuoteMeta(GETUSER)).
 		WithArgs(expectedUser.UserName).WillReturnRows(row)
@@ -176,8 +176,8 @@ func TestMySQLStore_GetByUserName(t *testing.T) {
 
 	queryingErr := fmt.Errorf("DBMS error when querying")
 
-	wrongRow := sqlmock.NewRows([]string{"id", "email", "user_name", "first_name", "last_name", "photo_url"})
-	wrongRow.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	wrongRow := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	wrongRow.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 	mock.ExpectQuery(regexp.QuoteMeta(GETUSER)).
 		WithArgs(expectedUser.UserName).WillReturnRows(wrongRow)
 	_, err = store.GetByUserName(expectedUser.UserName)
@@ -203,8 +203,8 @@ func TestMySQLStore_Insert(t *testing.T) {
 	store := NewSQLStore(db)
 	// This tells our db to expect an insert query with certain arguments with a certain
 	// return result
-	mock.ExpectExec(regexp.QuoteMeta("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")).
-		WithArgs(inputUser.ID, inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
+	mock.ExpectExec(regexp.QuoteMeta("insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)")).
+		WithArgs(inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 
 	user, err := store.Insert(inputUser)
@@ -253,13 +253,13 @@ func TestMySQLStore_Update(t *testing.T) {
 		"Hanks",
 	}
 
-	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
-	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	row := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	row.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
 	mock.ExpectExec(regexp.QuoteMeta(UPDATESTATEMENT)).
 		WithArgs(update.FirstName, update.LastName, expectedUser.ID).
 		WillReturnResult(sqlmock.NewResult(2, 1))
-
+		
 	mock.ExpectQuery(regexp.QuoteMeta("select * from users where id=?")).
 		WithArgs(expectedUser.ID).
 		WillReturnRows(row)
@@ -304,8 +304,8 @@ func TestMySQLStore_Delete(t *testing.T) {
 		FirstName: "Min",
 		LastName:  "Yang",
 	}
-	row := sqlmock.NewRows([]string{"id", "email", "pass_hash", "user_name", "first_name", "last_name", "photo_url"})
-	row.AddRow(expectedUser.ID, expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
+	row := sqlmock.NewRows([]string{"email", "passHash", "userName", "firstName", "lastName", "photoUrl"})
+	row.AddRow(expectedUser.Email, expectedUser.PassHash, expectedUser.UserName, expectedUser.FirstName, expectedUser.LastName, expectedUser.PhotoURL)
 
 	store := NewSQLStore(db)
 

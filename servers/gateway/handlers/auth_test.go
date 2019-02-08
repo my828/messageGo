@@ -154,7 +154,6 @@ func TestContext_InsertNewUserHandler(t *testing.T) {
 	}
 }
 
-
 func TestContext_PatchUserHandler(t *testing.T) {
 	context := &Context{}
 	validUser := users.User{
@@ -171,7 +170,7 @@ func TestContext_PatchUserHandler(t *testing.T) {
 		name                string
 		method              string
 		idPath              string
-		requestType			string
+		requestType         string
 		requestBody         *users.Updates
 		expectedStatusCode  int
 		expectedError       bool
@@ -371,7 +370,7 @@ func TestContext_PostSessionHandler(t *testing.T) {
 	cases := []struct {
 		name                string
 		method              string
-		requestType			string
+		requestType         string
 		requestBody         *users.Credentials
 		expectedStatusCode  int
 		expectedError       bool
@@ -424,6 +423,18 @@ func TestContext_PostSessionHandler(t *testing.T) {
 				Email: "no",
 			},
 			http.StatusUnsupportedMediaType,
+			true,
+			"text/plain; charset=utf-8",
+			&users.User{},
+		},
+		{
+			"Bad Credential Request",
+			http.MethodPost,
+			ContentTypeApplicationJSON,
+			&users.Credentials{
+				Email: "no",
+			},
+			http.StatusBadRequest,
 			true,
 			"text/plain; charset=utf-8",
 			&users.User{},
@@ -499,10 +510,19 @@ func TestContext_DeleteSessionHandler(t *testing.T) {
 			true,
 			ContentTypeTextPlain,
 		},
+		{
+			"Invalid Delete Request",
+			http.MethodDelete,
+			"",
+			http.StatusForbidden,
+			true,
+			ContentTypeTextPlain,
+		},
 	}
 
 	for _, c := range cases {
 		request := httptest.NewRequest(c.method, "/v1/users/"+c.idPath, nil)
+
 		request.Header.Set(ContentTypeHeader, ContentTypeApplicationJSON)
 
 		recorder := httptest.NewRecorder()

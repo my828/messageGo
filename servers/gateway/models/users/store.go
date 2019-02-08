@@ -28,4 +28,6 @@ type Store interface {
 
 	//Delete deletes the user with the given ID
 	Delete(id int64) error
+
+	InsertSignin(signin *SignIn) error
 }

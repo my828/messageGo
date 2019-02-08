@@ -3,8 +3,6 @@ package users
 import (
 	"database/sql"
 	"fmt"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 type SQLStore struct {
@@ -16,6 +14,7 @@ func NewSQLStore(db *sql.DB) *SQLStore {
 		db,
 	}
 }
+
 func (sqls *SQLStore) RefactorGetBy(input string, what string) (*User, error) {
 	rows, err := sqls.Db.Query("select * from users where "+what+"=?", input)
 	if err != nil {
@@ -62,24 +61,18 @@ func (sqls *SQLStore) GetByEmail(email string) (*User, error) {
 
 //GetByUserName returns the User with the given Username
 func (sqls *SQLStore) GetByUserName(username string) (*User, error) {
-	return sqls.RefactorGetBy(username, "user_name")
+	return sqls.RefactorGetBy(username, "userName")
 }
 
 //Insert inserts the user into the database, and returns
 //the newly-inserted User, complete with the DBMS-assigned ID
 func (sqls *SQLStore) Insert(user *User) (*User, error) {
-	// insq := "insert into users(id, email, pass_hash, user_name, first_name, last_name
-	// 		photo_url) values (?,?,?,?,?,?,?)"
-	// stmt, err := sqls.Db.Prepare("insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)")
-	// if err != nil {
-	// 	return &User{}, fmt.Errorf("error preparing statement %v", err)
-	// }
-	insq := "insert into users(id, email, pass_hash, user_name, first_name, last_name, photo_url) values (?,?,?,?,?,?,?)"
-	res, err := sqls.Db.Exec(insq, user.ID, user.Email, user.PassHash, user.UserName,
+	insq := "insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
+	res, err := sqls.Db.Exec(insq, user.Email, user.PassHash, user.UserName,
 		user.FirstName, user.LastName, user.PhotoURL)
 
 	if err != nil {
-		return &User{}, fmt.Errorf("error inserting new row: %v\n", err)
+		return &User{}, fmt.Errorf("error inserting new row to users: %v\n", err)
 	}
 	//get the auto-assigned ID for the new row
 	id, err := res.LastInsertId()
@@ -94,7 +87,7 @@ func (sqls *SQLStore) Insert(user *User) (*User, error) {
 //Update applies UserUpdates to the given user ID
 //and returns the newly-updated user
 func (sqls *SQLStore) Update(id int64, updates *Updates) (*User, error) {
-	insq := "update users set first_name=?, last_name=? where id=?"
+	insq := "update users set firstName=?, lastName=? where id=?"
 	_, err := sqls.Db.Exec(insq, updates.FirstName, updates.LastName, id)
 	if err != nil {
 		return &User{}, fmt.Errorf("error updating database %v", err)
@@ -109,6 +102,17 @@ func (sqls *SQLStore) Delete(id int64) error {
 	_, err := sqls.Db.Exec(insq, id)
 	if err != nil {
 		return fmt.Errorf("error deleteing from database %v", err)
+	}
+	return nil
+}
+
+// insert new signin session
+func (sqls *SQLStore) InsertSignin(signin *SignIn) error {
+	insq := "insert into signinuser(userID, signinDatetime, ipAddress) values (?,?,?)"
+	_, err := sqls.Db.Exec(insq, signin.Id, signin.Time, signin.Ip)
+
+	if err != nil {
+		return fmt.Errorf("error inserting new row to signinuser: %v\n", err)
 	}
 	return nil
 }

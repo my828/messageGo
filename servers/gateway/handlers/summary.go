@@ -86,11 +86,6 @@ func SummaryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(pageSummary); err != nil {
-		http.Error(w, fmt.Sprintf("error fetching HTML %v", err), 500)
-		return
-	}
 	buffer, err := json.Marshal(pageSummary)
 	defer html.Close()
 	w.Write(buffer)

@@ -1,4 +1,5 @@
 #!/bin/bash
 sh build.sh
 docker push my828/gateway
-ssh -oStrictHostKeyChecking=no ec2-user@ec2-35-162-127-249.us-west-2.compute.amazonaws.com 'bash -s' < upgrade-server.sh 
+docker push my828/database
+ssh -oStrictHostKeyChecking=no ec2-user@ec2-3-94-215-128.compute-1.amazonaws.com 'bash -s' < upgrade-server.sh 

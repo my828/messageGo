@@ -2,9 +2,17 @@ package main
 
 import (
 	"assignments-my828/servers/gateway/handlers"
+	"assignments-my828/servers/gateway/models/users"
+	"assignments-my828/servers/gateway/sessions"
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/go-redis/redis"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 //main is the main entry point for the server
@@ -35,8 +43,58 @@ func main() {
 		log.Fatalf("No certificate path!")
 	}
 
+	sessionKey := os.Getenv("SESSIONKEY")
+	if sessionKey == "" {
+		sessionKey = "sessionkey"
+	}
+
+	//the address of your redis session store server
+	redisAddr := os.Getenv("REDISADDR")
+	if redisAddr == "" {
+		log.Fatalf("No redis address found!")
+	}
+
+	// the full data source name to
+	// pass as the second parameter to sql.Open()
+	// rootPassword := os.Getenv("MYSQL_ROOT_PASSWORD")
+	// dsn := fmt.Sprintf("root:%s@tcp(users:3306)/userinfo", rootPassword)
+
+	client := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+	sessionStore := sessions.NewRedisStore(client, time.Hour)
+
+	db, err := sql.Open("mysql", os.Getenv("DSN"))
+	log.Println(os.Getenv("DSN"))
+	if err != nil {
+		log.Fatalf("No sql found!")
+		os.Exit(1)
+	}
+	defer db.Close()
+	userStore := users.NewSQLStore(db)
 	mux := http.NewServeMux()
+
+	context := &handlers.Context{
+		Key:          sessionKey,
+		SessionStore: sessionStore,
+		UsersStore:   userStore,
+	}
+	if _, err := client.Ping().Result(); err != nil {
+		fmt.Printf("error pinging database: %v\n", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		fmt.Printf("error pinging database: %v\n", err)
+	}
+
 	mux.HandleFunc("/v1/summary", handlers.SummaryHandler)
+	mux.HandleFunc("/v1/users", context.UsersHandler)
+	mux.HandleFunc("/v1/users/", context.SpecificUserHandler)
+	mux.HandleFunc("/v1/sessions", context.SessionsHandler)
+	mux.HandleFunc("/v1/sessions/", context.SpecificSessionHandler)
+
+	//wrap new mux with CORS middleware handler
+	wrappedMux := handlers.NewCorsHandler(mux)
 	log.Printf("server is listening at http://%s", addr)
-	log.Fatal(http.ListenAndServeTLS(addr, tlsCertPath, tlsKeyPath, mux))
+	log.Fatal(http.ListenAndServeTLS(addr, tlsCertPath, tlsKeyPath, wrappedMux))
 }

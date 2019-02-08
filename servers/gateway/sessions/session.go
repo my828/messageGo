@@ -49,7 +49,7 @@ func GetSessionID(r *http.Request, signingKey string) (SessionID, error) {
 		auth = r.URL.Query().Get(paramAuthorization)
 	}
 	if !strings.Contains(auth, schemeBearer) {
-		return InvalidSessionID, fmt.Errorf("Authorization is not valid")
+		return InvalidSessionID, ErrInvalidScheme
 	}
 	id := strings.Split(auth, " ")[1]
 	sessionID, err := ValidateID(id, signingKey)

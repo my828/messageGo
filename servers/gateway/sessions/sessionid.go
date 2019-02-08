@@ -76,9 +76,10 @@ func ValidateID(id string, signingKey string) (SessionID, error) {
 	//HMAC hash stored in the remaining bytes. If they match,
 	//return the entire `id` parameter as a SessionID type.
 	//If not, return InvalidSessionID and ErrInvalidID.
+
 	decode, err := base64.URLEncoding.DecodeString(id)
 	if err != nil {
-		return InvalidSessionID, fmt.Errorf("Invalid id")
+		return InvalidSessionID, fmt.Errorf("Cannot validate ID: %v", err)
 	}
 	hash := hmac.New(sha256.New, []byte(signingKey))
 	hash.Write([]byte(decode[:idLength]))

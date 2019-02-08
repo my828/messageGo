@@ -2,10 +2,11 @@ package users
 
 import (
 	"crypto/md5"
+	"encoding/hex"
 	"fmt"
-	"io"
 	"net/mail"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,6 +49,11 @@ type NewUser struct {
 type Updates struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+}
+type SignIn struct {
+	Id   int64     `json:"userID,omitempty"`
+	Time time.Time `json:"signinDatetime,omitempty"`
+	Ip   string    `json:"ipAddress,omitempty"`
 }
 
 //Validate validates the new user and returns an error if
@@ -98,9 +104,10 @@ func (nu *NewUser) ToUser() (*User, error) {
 	}
 	//get hash
 	h := md5.New()
-	if _, err := io.WriteString(h, nu.Email); err != nil {
-		return &User{}, err
-	}
+	photourl := gravatarBasePhotoURL + hex.EncodeToString(h.Sum(nil))
+	// if _, err := io.WriteString(h, nu.Email); err != nil {
+	// 	return &User{}, err
+	// }
 	user := &User{
 		0,
 		nu.Email,
@@ -108,7 +115,7 @@ func (nu *NewUser) ToUser() (*User, error) {
 		nu.UserName,
 		nu.FirstName,
 		nu.LastName,
-		gravatarBasePhotoURL + string(h.Sum(nil)),
+		gravatarBasePhotoURL + photourl,
 	}
 	user.SetPassword(nu.Password)
 	if err := user.Authenticate(nu.Password); err != nil {
@@ -153,9 +160,6 @@ func (u *User) Authenticate(password string) error {
 	//password with the stored PassHash
 	//https://godoc.org/golang.org/x/crypto/bcrypt
 	err := bcrypt.CompareHashAndPassword(u.PassHash, []byte(password))
-	// if err != nil {
-	// 	return err
-	// }
 	return err
 }
 

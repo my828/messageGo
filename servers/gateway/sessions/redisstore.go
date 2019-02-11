@@ -69,7 +69,6 @@ func (rs *RedisStore) Get(sid SessionID, sessionState interface{}) error {
 
 //Delete deletes all state data associated with the SessionID from the store.
 func (rs *RedisStore) Delete(sid SessionID) error {
-	//TODO: delete the data stored in redis for the provided SessionID
 	err := rs.Client.Del(sid.getRedisKey())
 	if err.Err() != nil {
 		return err.Err()

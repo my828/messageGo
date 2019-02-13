@@ -14,7 +14,7 @@ import (
 const GETID = "select * from users where id=?"
 const GETEMAIL = "select * from users where email=?"
 const GETUSER = "select * from users where userName=?"
-const INSERTSTATEMENT = "insert into users(email, pass_hash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
+const INSERTSTATEMENT = "insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
 const UPDATESTATEMENT = "update users set firstName=?, lastName=? where id=?"
 const DELETESTATEMENT = "delete from users where id=?"
 
@@ -196,23 +196,31 @@ func TestMySQLStore_Insert(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
-	inputUser := &User{
+	newUser := &NewUser{
+		Email: "yang@example.com",
+		UserName: "minyang",
+		Password: "password",
+		PasswordConf: "password",
 		FirstName: "Min",
 		LastName:  "Yang",
+	}
+	user, err := newUser.ToUser()
+	if err != nil {
+		t.Errorf("error converting new user to user: %v", err)
 	}
 	store := NewSQLStore(db)
 	// This tells our db to expect an insert query with certain arguments with a certain
 	// return result
 	mock.ExpectExec(regexp.QuoteMeta("insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)")).
-		WithArgs(inputUser.Email, inputUser.PassHash, inputUser.UserName, inputUser.FirstName, inputUser.LastName, inputUser.PhotoURL).
+		WithArgs(user.Email, user.PassHash, user.UserName, user.FirstName, user.LastName, user.PhotoURL).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 
-	user, err := store.Insert(inputUser)
-	inputUser.ID = user.ID
+	returnUser, err := store.Insert(user)
+	user.ID = returnUser.ID
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err == nil && !reflect.DeepEqual(user, inputUser) {
+	if err == nil && !reflect.DeepEqual(user, returnUser) {
 		t.Errorf("User returned does not match input user")
 	}
 
@@ -259,7 +267,7 @@ func TestMySQLStore_Update(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta(UPDATESTATEMENT)).
 		WithArgs(update.FirstName, update.LastName, expectedUser.ID).
 		WillReturnResult(sqlmock.NewResult(2, 1))
-		
+
 	mock.ExpectQuery(regexp.QuoteMeta("select * from users where id=?")).
 		WithArgs(expectedUser.ID).
 		WillReturnRows(row)

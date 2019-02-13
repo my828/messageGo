@@ -36,11 +36,11 @@ func main() {
 	}
 	tlsKeyPath := os.Getenv("TLSKEY")
 	if tlsKeyPath == "" {
-		log.Fatalf("No private key path!")
+		fmt.Printf("No private key path!")
 	}
 	tlsCertPath := os.Getenv("TLSCERT")
 	if tlsCertPath == "" {
-		log.Fatalf("No certificate path!")
+		fmt.Printf("No certificate found!")
 	}
 
 	sessionKey := os.Getenv("SESSIONKEY")
@@ -51,7 +51,7 @@ func main() {
 	//the address of your redis session store server
 	redisAddr := os.Getenv("REDISADDR")
 	if redisAddr == "" {
-		log.Fatalf("No redis address found!")
+		fmt.Printf("No redis address found!")
 	}
 
 	// the full data source name to

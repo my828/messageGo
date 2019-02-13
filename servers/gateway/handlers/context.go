@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"assignments-my828/servers/gateway/indexes"
 	"assignments-my828/servers/gateway/models/users"
 	"assignments-my828/servers/gateway/sessions"
 )
@@ -16,4 +17,5 @@ type Context struct {
 	Key          string
 	SessionStore sessions.Store
 	UsersStore   users.Store
+	SearchIndex  *indexes.Trie
 }

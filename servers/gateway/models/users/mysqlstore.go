@@ -1,6 +1,7 @@
 package users
 
 import (
+	"assignments-my828/servers/gateway/indexes"
 	"database/sql"
 	"fmt"
 )
@@ -15,6 +16,26 @@ func NewSQLStore(db *sql.DB) *SQLStore {
 	}
 }
 
+func (sqls *SQLStore) GetAllUser() (*indexes.Trie, error) {
+	t := indexes.NewTrie()
+	rows, err := sqls.Db.Query("select * from users")
+	if err != nil {
+		return &indexes.Trie{}, fmt.Errorf("Error getting all user data: %v", err)
+	}
+	defer rows.Close()
+	user := User{}
+	for rows.Next() {
+		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
+			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
+			return &indexes.Trie{}, fmt.Errorf("Error getting data")
+		}
+		t.SplitNameAddToTrie(user.UserName, user.ID)
+		t.SplitNameAddToTrie(user.FirstName, user.ID)
+		t.SplitNameAddToTrie(user.LastName, user.ID)
+	}
+	return &indexes.Trie{}, nil
+}
+
 func (sqls *SQLStore) RefactorGetBy(input string, what string) (*User, error) {
 	rows, err := sqls.Db.Query("select * from users where "+what+"=?", input)
 	if err != nil {
@@ -22,12 +43,11 @@ func (sqls *SQLStore) RefactorGetBy(input string, what string) (*User, error) {
 	}
 	defer rows.Close()
 	user := &User{}
-	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
-			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
-			return &User{}, fmt.Errorf("Error getting data")
-		}
+	if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
+		&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
+		return &User{}, fmt.Errorf("Error getting data")
 	}
+
 	if err := rows.Err(); err != nil {
 		return &User{}, fmt.Errorf("error getting next row: %v\n", err)
 	}
@@ -42,12 +62,11 @@ func (sqls *SQLStore) GetByID(id int64) (*User, error) {
 	}
 	defer rows.Close()
 	user := &User{}
-	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
-			&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
-			return &User{}, fmt.Errorf("Error getting data")
-		}
+	if err := rows.Scan(&user.ID, &user.Email, &user.PassHash, &user.UserName,
+		&user.FirstName, &user.LastName, &user.PhotoURL); err != nil {
+		return &User{}, fmt.Errorf("Error getting data")
 	}
+
 	if err := rows.Err(); err != nil {
 		return &User{}, fmt.Errorf("error getting next row: %v\n", err)
 	}

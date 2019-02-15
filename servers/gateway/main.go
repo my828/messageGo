@@ -92,6 +92,7 @@ func main() {
 	mux.HandleFunc("/v1/users/", context.SpecificUserHandler)
 	mux.HandleFunc("/v1/sessions", context.SessionsHandler)
 	mux.HandleFunc("/v1/sessions/", context.SpecificSessionHandler)
+	mux.HandleFunc("/v1/users", context.SearchHandler)
 
 	//wrap new mux with CORS middleware handler
 	wrappedMux := handlers.NewCorsHandler(mux)

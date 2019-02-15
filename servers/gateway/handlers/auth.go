@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"assignments-my828/servers/gateway/indexes"
 	"assignments-my828/servers/gateway/models/users"
 	"assignments-my828/servers/gateway/sessions"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,11 +30,12 @@ const forwardFor = "X-Forwarded-For"
 //access to things like the session store and user store.
 
 // insert into SignIn (time, asdf) values (NOW(), asdf)
-func NewContext(key string, sessionStore sessions.Store, userStore users.Store) *Context {
+func NewContext(key string, sessionStore sessions.Store, userStore users.Store, searchIndex *indexes.Trie) *Context {
 	return &Context{
 		key,
 		sessionStore,
 		userStore,
+		searchIndex,
 	}
 }
 
@@ -62,6 +65,9 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		c.SearchIndex.SplitNameAddToTrie(user.UserName, user.ID)
+		c.SearchIndex.SplitNameAddToTrie(user.FirstName, user.ID)
+		c.SearchIndex.SplitNameAddToTrie(user.LastName, user.ID)
 
 		state := &SessionState{
 			time.Now(),
@@ -90,7 +96,7 @@ func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 	state := &SessionState{}
 
 	if _, err := sessions.GetState(r, c.Key, c.SessionStore, state); err != nil {
-		http.Error(w, fmt.Sprintf("Unable get state: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Unable get state: %v", err), http.StatusUnauthorized)
 		return
 	}
 	idString := path.Base(r.URL.Path)
@@ -141,13 +147,16 @@ func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusBadRequest)
 			return
 		}
+		c.SearchIndex.Remove(state.User.FirstName, state.User.ID)
+		c.SearchIndex.Remove(state.User.LastName, state.User.ID)
+		c.SearchIndex.Add(update.FirstName, state.User.ID)
+		c.SearchIndex.Add(update.LastName, state.User.ID)
 
 		user, err := c.UsersStore.Update(state.User.ID, update)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error updating user %v:", err), http.StatusBadRequest)
 			return
 		}
-
 		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(user); err != nil {
@@ -199,9 +208,9 @@ func (c *Context) SessionsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		//record signin user
 		signin := &users.SignIn{
-			Id: user.ID,
+			Id:   user.ID,
 			Time: time.Now(),
-			Ip: ipAddr,
+			Ip:   ipAddr,
 		}
 		if err := c.UsersStore.InsertSignin(signin); err != nil {
 			http.Error(w, fmt.Sprintf("Error inserting to database: %v", err), 500)
@@ -230,6 +239,43 @@ func (c *Context) SpecificSessionHandler(w http.ResponseWriter, r *http.Request)
 		sessions.EndSession(r, c.Key, c.SessionStore)
 		w.Header().Add(ContentTypeHeader, ContentTypeTextPlain)
 		w.Write([]byte("Signed out"))
+	} else {
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
+}
+
+func (c *Context) SearchHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		auth := r.Header.Get(headerAuthorization)
+		if auth == "" {
+			auth = r.URL.Query().Get(paramAuthorization)
+		}
+		if !strings.Contains(auth, schemeBearer) {
+			http.Error(w, fmt.Sprintf("Unauthorized user!"), http.StatusUnauthorized)
+		}
+		query := r.FormValue("q")
+		if len(query) == 0 {
+			http.Error(w, fmt.Sprint("Require query!"), http.StatusBadRequest)
+		}
+		results := c.SearchIndex.Find(query, 20)
+		users := []*users.User{}
+		for _, i := range results {
+			user, err := c.UsersStore.GetByID(i)
+			if err != nil {
+				http.Error(w, fmt.Sprint("Error getting user from user store"), http.StatusBadRequest)
+			}
+			users = append(users, user)
+		}
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].UserName < users[j].UserName
+		})
+		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(users); err != nil {
+			http.Error(w, fmt.Sprintf("Error encoding JSON: %v", err), http.StatusInternalServerError)
+			return
+		}
 	} else {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
 		return

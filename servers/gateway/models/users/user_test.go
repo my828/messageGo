@@ -8,7 +8,7 @@ import (
 )
 
 //TODO: add tests for the various functions in user.go, as described in the assignment.
-//use `go test -cover` to ensure that you are covering all or nearly all of your code paths.
+//use go test -cover` to ensure that you are covering all or nearly all of your code paths.
 func TestToUser(t *testing.T) {
 	cases := []struct {
 		name          string

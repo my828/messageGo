@@ -60,6 +60,7 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// insert to database
+		//fmt.Printf("##### %d\n", c.UsersStore)
 		user, err = c.UsersStore.Insert(user)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -75,16 +76,51 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// being new session for new user
-		c.Key = string(user.UserName)
 		_, err = sessions.BeginSession(c.Key, c.SessionStore, state, w)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+
 		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(user); err != nil {
 			http.Error(w, fmt.Sprintf("Error encoding JSON: %v", err), http.StatusInternalServerError)
+			return
+		}
+	} else if r.Method == http.MethodGet {
+		auth := r.Header.Get(headerAuthorization)
+		if auth == "" {
+			auth = r.URL.Query().Get(paramAuthorization)
+		}
+
+		if !strings.Contains(auth, schemeBearer) {
+			http.Error(w, fmt.Sprintf("Unauthorized user!"), http.StatusUnauthorized)
+			return
+		}
+		query := r.FormValue("q")
+		if len(query) == 0 {
+			http.Error(w, fmt.Sprint("Require query!"), http.StatusBadRequest)
+			return
+		}
+		results := c.SearchIndex.Find(query, 20)
+		users := []*users.User{}
+		for _, i := range results {
+			user, err := c.UsersStore.GetByID(i)
+			if err != nil {
+				http.Error(w, fmt.Sprint("Error getting user from user store"), http.StatusBadRequest)
+				return
+			}
+			users = append(users, user)
+		}
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].UserName < users[j].UserName
+		})
+		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(users); err != nil {
+			http.Error(w, fmt.Sprintf("Error encoding JSON: %v", err), http.StatusInternalServerError)
+			return
 		}
 	} else {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -245,39 +281,39 @@ func (c *Context) SpecificSessionHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (c *Context) SearchHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		auth := r.Header.Get(headerAuthorization)
-		if auth == "" {
-			auth = r.URL.Query().Get(paramAuthorization)
-		}
-		if !strings.Contains(auth, schemeBearer) {
-			http.Error(w, fmt.Sprintf("Unauthorized user!"), http.StatusUnauthorized)
-		}
-		query := r.FormValue("q")
-		if len(query) == 0 {
-			http.Error(w, fmt.Sprint("Require query!"), http.StatusBadRequest)
-		}
-		results := c.SearchIndex.Find(query, 20)
-		users := []*users.User{}
-		for _, i := range results {
-			user, err := c.UsersStore.GetByID(i)
-			if err != nil {
-				http.Error(w, fmt.Sprint("Error getting user from user store"), http.StatusBadRequest)
-			}
-			users = append(users, user)
-		}
-		sort.Slice(users, func(i, j int) bool {
-			return users[i].UserName < users[j].UserName
-		})
-		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(users); err != nil {
-			http.Error(w, fmt.Sprintf("Error encoding JSON: %v", err), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
-		return
-	}
-}
+// func (c *Context) SearchHandler(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method == http.MethodGet {
+// 		auth := r.Header.Get(headerAuthorization)
+// 		if auth == "" {
+// 			auth = r.URL.Query().Get(paramAuthorization)
+// 		}
+// 		if !strings.Contains(auth, schemeBearer) {
+// 			http.Error(w, fmt.Sprintf("Unauthorized user!"), http.StatusUnauthorized)
+// 		}
+// 		query := r.FormValue("q")
+// 		if len(query) == 0 {
+// 			http.Error(w, fmt.Sprint("Require query!"), http.StatusBadRequest)
+// 		}
+// 		results := c.SearchIndex.Find(query, 20)
+// 		users := []*users.User{}
+// 		for _, i := range results {
+// 			user, err := c.UsersStore.GetByID(i)
+// 			if err != nil {
+// 				http.Error(w, fmt.Sprint("Error getting user from user store"), http.StatusBadRequest)
+// 			}
+// 			users = append(users, user)
+// 		}
+// 		sort.Slice(users, func(i, j int) bool {
+// 			return users[i].UserName < users[j].UserName
+// 		})
+// 		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
+// 		w.WriteHeader(http.StatusCreated)
+// 		if err := json.NewEncoder(w).Encode(users); err != nil {
+// 			http.Error(w, fmt.Sprintf("Error encoding JSON: %v", err), http.StatusInternalServerError)
+// 			return
+// 		}
+// 	} else {
+// 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+// 		return
+// 	}
+// }

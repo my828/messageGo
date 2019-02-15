@@ -27,12 +27,13 @@ func BeginSession(signingKey string, store Store, sessionState interface{}, w ht
 	//    "Authorization: Bearer <sessionID>"
 	//  where "<sessionID>" is replaced with the newly-created SessionID
 	//  (note the constants declared for you above, which will help you avoid typos)
+	
 	sessionID, err := NewSessionID(signingKey)
 	if err != nil {
 		return InvalidSessionID, fmt.Errorf("Not able to get sessionID %v", err)
 	}
 	if err := store.Save(sessionID, sessionState); err != nil {
-		return InvalidSessionID, fmt.Errorf("Not able to get sessionID %v", err)
+		return InvalidSessionID, fmt.Errorf("Not able to save session %v", err)
 	}
 	w.Header().Add(headerAuthorization, schemeBearer+sessionID.String())
 	return sessionID, nil

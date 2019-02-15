@@ -27,10 +27,12 @@ func NewCorsHandler(handlerToWrap http.Handler) *Cors {
 }
 
 func (c *Cors) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(allowOrigin, "*")
-	w.Header().Set(allowMethod, "GET, PUT, POST, PATCH, DELETE")
-	w.Header().Set(allowHeader, "Content-Type, Authorization")
-	w.Header().Set(exposeHeader, "Authorization")
-	w.Header().Set(maxAge, "600")
+  if r.Method == "OPTION" {
+    w.Header().Set(allowOrigin, "*")
+    w.Header().Set(allowMethod, "GET, PUT, POST, PATCH, DELETE")
+    w.Header().Set(allowHeader, "Content-Type, Authorization")
+    w.Header().Set(exposeHeader, "Authorization")
+    w.Header().Set(maxAge, "600")
+  }
 	c.MyHandler.ServeHTTP(w, r)
 }

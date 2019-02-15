@@ -46,7 +46,6 @@ func (t *Trie) Len() int {
 //Add adds a key and value to the trie.
 func (t *Trie) Add(key string, value int64) {
 	node := t.Root
-	//node.mx.Lock()
 	key = strings.ToLower(key)
 	runes := []rune(key)
 	for i := range runes {
@@ -62,8 +61,9 @@ func (t *Trie) Add(key string, value int64) {
 		}
 		node = node.Children[char]
 	}
-	node.Val.add(value)
-	//node.mx.Unlock()
+	if node.Val != nil {
+		node.Val.add(value)
+	}
 }
 
 //Find finds `max` values matching `prefix`. If the trie
@@ -73,7 +73,6 @@ func (t *Trie) Find(prefix string, max int) []int64 {
 	prefix = strings.ToLower(prefix)
 	runes := []rune(prefix)
 	node := t.Root
-	//node.mx.Lock()
 	if len(prefix) == 0 || max == 0 {
 		return nil
 	}
@@ -86,7 +85,8 @@ func (t *Trie) Find(prefix string, max int) []int64 {
 		node = node.Children[char]
 	}
 	result := []int64{}
-	//defer node.mx.Unlock()
+	node.mx.RLock()
+	defer node.mx.RUnlock()
 	return dfs(node, result, max)
 }
 
@@ -124,8 +124,8 @@ func dfs(node *Node, result []int64, max int) []int64 {
 // and trims branches with no values.
 func (t *Trie) Remove(key string, value int64) {
 	runes := []rune(key)
-	//t.Root.mx.Lock()
-	//defer t.Root.mx.Unlock()
+	t.Root.mx.Lock()
+	defer t.Root.mx.Unlock()
 	t.RemoveHelper(t.Root, runes, value, 0, true)
 }
 
@@ -151,10 +151,12 @@ func (t *Trie) RemoveHelper(node *Node, keys []rune, value int64, index int, fou
 }
 
 func (t *Trie) SplitNameAddToTrie(name string, id int64) {
+	t.Root.mx.Lock()
 	names := strings.Split(name, " ")
 	for _, s := range names {
 		t.Add(s, id)
 	}
+	t.Root.mx.Unlock()
 }
 
 //int64set is a set of int64 values

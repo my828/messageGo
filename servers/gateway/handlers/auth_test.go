@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"assignments-my828/servers/gateway/indexes"
 	"assignments-my828/servers/gateway/models/users"
 	"assignments-my828/servers/gateway/sessions"
 	"bytes"
@@ -47,6 +48,17 @@ func TestContext_InsertNewUserHandler(t *testing.T) {
 		LastName:     "Yang",
 	}
 
+	userStore := users.NewMockStore(&users.User{
+		Email:     "testing@example.com",
+		FirstName: "Min",
+		LastName:  "Yang",
+	})
+	trie := indexes.NewTrie()
+	trie.Add("Min", 0)
+	context := &Context{
+		UsersStore: userStore,
+		SearchIndex: trie,
+	}
 	cases := []struct {
 		name                string
 		requestBody         *users.NewUser
@@ -71,7 +83,7 @@ func TestContext_InsertNewUserHandler(t *testing.T) {
 			"Invalid Post Request",
 			&validNewUser,
 			"application/json",
-			http.MethodGet,
+			http.MethodPatch,
 			http.StatusMethodNotAllowed,
 			true,
 			"text/plain; charset=utf-8",
@@ -109,22 +121,42 @@ func TestContext_InsertNewUserHandler(t *testing.T) {
 			"text/plain; charset=utf-8",
 			nil,
 		},
+		{
+			"Valid GET Request",
+			&validNewUser,
+			"application/json",
+			http.MethodGet,
+			200,
+			false,
+			"application/json",
+			&validUser,
+		},
 	}
 
 	for _, c := range cases {
-		context := &Context{}
+
 		body, _ := json.Marshal(c.requestBody)
 		if c.requestBody.FirstName == "fail" {
 			body = []byte("")
 		}
 		request := httptest.NewRequest(c.method, "/v1/users", bytes.NewBuffer(body))
+		if c.method == http.MethodGet {
+			request = httptest.NewRequest(c.method, "/v1/users?q=Min", bytes.NewBuffer(body))
+		}
 		request.Header.Set(ContentTypeHeader, c.requestType)
 		recorder := httptest.NewRecorder()
-		// make sql store
-		user, _ := c.requestBody.ToUser()
-		context.UsersStore = NewMockStore(user)
+		context.Key = "key"
+		
 		// make mem store
 		context.SessionStore = sessions.NewMemStore(time.Hour, time.Minute)
+		sessionID, _ := sessions.NewSessionID(context.Key)
+		request.Header.Add("Authorization", "Bearer "+sessionID.String())
+
+		state := &SessionState{
+			time.Now(),
+			&validUser,
+		}
+		context.SessionStore.Save(sessionID, state)
 		context.UsersHandler(recorder, request)
 		response := recorder.Result()
 
@@ -139,23 +171,35 @@ func TestContext_InsertNewUserHandler(t *testing.T) {
 			t.Errorf("case %s: incorrect status code: expected: %d recieved: %d",
 				c.name, c.expectedStatusCode, resStatusCode)
 		}
-
-		user = &users.User{}
-		err := json.NewDecoder(response.Body).Decode(user)
-		if c.expectedError && err == nil {
-			t.Errorf("case %s: expected error but revieved none", c.name)
-		}
-
-		if !c.expectedError && c.expectedReturn.Email != user.Email &&
-			c.expectedReturn.FirstName != user.FirstName && c.expectedReturn.LastName != user.LastName {
+		responseUser := &users.User{}
+		responseUsers := []users.User{}
+		if c.method == "GET" {
+			err := json.NewDecoder(response.Body).Decode(responseUsers)
+			if c.expectedError && err == nil {
+				t.Errorf("case %s: expected error but revieved none", c.name)
+			}
+			for i, user := range responseUsers {
+				if !c.expectedError && c.expectedReturn.Email != user.Email &&
+				c.expectedReturn.FirstName != user.FirstName && c.expectedReturn.LastName != responseUsers[i].LastName {
+				t.Errorf("case %s: incorrect return: expected %v but revieved %v",
+					c.name, c.expectedReturn, responseUsers)
+				}
+			}
+		} else {
+			err := json.NewDecoder(response.Body).Decode(responseUser)
+			if c.expectedError && err == nil {
+				t.Errorf("case %s: expected error but revieved none", c.name)
+			}
+			if !c.expectedError && c.expectedReturn.Email != responseUser.Email &&
+			c.expectedReturn.FirstName != responseUser.FirstName && c.expectedReturn.LastName != responseUser.LastName {
 			t.Errorf("case %s: incorrect return: expected %v but revieved %v",
-				c.name, c.expectedReturn, user)
+				c.name, c.expectedReturn, responseUser)
+		}
 		}
 	}
 }
 
 func TestContext_PatchUserHandler(t *testing.T) {
-	context := &Context{}
 	validUser := users.User{
 		ID:        1,
 		Email:     "testing@example.com",
@@ -165,6 +209,16 @@ func TestContext_PatchUserHandler(t *testing.T) {
 	update := &users.Updates{
 		FirstName: "Success",
 		LastName:  "Update",
+	}
+	userStore := users.NewMockStore(&users.User{
+		Email:     "testing@example.com",
+		FirstName: "Min",
+		LastName:  "Yang",
+	})
+	trie := indexes.NewTrie()
+	context := &Context{
+		UsersStore: userStore,
+		SearchIndex: trie,
 	}
 	cases := []struct {
 		name                string
@@ -323,7 +377,6 @@ func TestContext_PatchUserHandler(t *testing.T) {
 			&validUser,
 		}
 		context.SessionStore.Save(sessionID, state)
-		context.UsersStore = NewMockStore(&validUser)
 		context.SpecificUserHandler(recorder, request)
 		response := recorder.Result()
 
@@ -354,7 +407,6 @@ func TestContext_PatchUserHandler(t *testing.T) {
 }
 
 func TestContext_PostSessionHandler(t *testing.T) {
-	context := &Context{}
 	validUser := users.NewUser{
 		Email:        "testing@example.com",
 		Password:     "password",
@@ -366,6 +418,16 @@ func TestContext_PostSessionHandler(t *testing.T) {
 	credentials := &users.Credentials{
 		Email:    "testing@example.com",
 		Password: "password",
+	}
+	userStore := users.NewMockStore(&users.User{
+		Email:     "testing@example.com",
+		FirstName: "Min",
+		LastName:  "Yang",
+	})
+	trie := indexes.NewTrie()
+	context := &Context{
+		UsersStore: userStore,
+		SearchIndex: trie,
 	}
 	cases := []struct {
 		name                string
@@ -454,7 +516,6 @@ func TestContext_PostSessionHandler(t *testing.T) {
 		context.Key = "Min"
 		context.SessionStore = sessions.NewMemStore(time.Hour, time.Minute)
 		user, _ := validUser.ToUser()
-		context.UsersStore = NewMockStore(user)
 		context.SessionsHandler(recorder, request)
 		response := recorder.Result()
 

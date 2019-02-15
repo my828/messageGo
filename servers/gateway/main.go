@@ -1,6 +1,7 @@
 package main
 
 import (
+	"assignments-my828/servers/gateway/indexes"
 	"assignments-my828/servers/gateway/handlers"
 	"assignments-my828/servers/gateway/models/users"
 	"assignments-my828/servers/gateway/sessions"
@@ -70,6 +71,7 @@ func main() {
 		log.Fatalf("No sql found!")
 		os.Exit(1)
 	}
+	trie := indexes.NewTrie()
 	defer db.Close()
 	userStore := users.NewSQLStore(db)
 	mux := http.NewServeMux()
@@ -78,6 +80,7 @@ func main() {
 		Key:          sessionKey,
 		SessionStore: sessionStore,
 		UsersStore:   userStore,
+		SearchIndex: trie,
 	}
 	if _, err := client.Ping().Result(); err != nil {
 		fmt.Printf("error pinging database: %v\n", err)
@@ -86,13 +89,11 @@ func main() {
 	if err := db.Ping(); err != nil {
 		fmt.Printf("error pinging database: %v\n", err)
 	}
-
 	mux.HandleFunc("/v1/summary", handlers.SummaryHandler)
 	mux.HandleFunc("/v1/users", context.UsersHandler)
 	mux.HandleFunc("/v1/users/", context.SpecificUserHandler)
 	mux.HandleFunc("/v1/sessions", context.SessionsHandler)
 	mux.HandleFunc("/v1/sessions/", context.SpecificSessionHandler)
-	mux.HandleFunc("/v1/users", context.SearchHandler)
 
 	//wrap new mux with CORS middleware handler
 	wrappedMux := handlers.NewCorsHandler(mux)

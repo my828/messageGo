@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const messageSchema = mongoose.Schema({
     channelID: {
-        type: Number,
+        type: mongoose.Schema.Types.ObjectId,
         required: [true, 'Channel ID is required']
     },
     body: {
@@ -14,10 +14,8 @@ const messageSchema = mongoose.Schema({
         default: Date.now,
     },
     creator: {
-        id: { type: Number, required: true},
-        userName: { type: String, required: true},
-        firstName: { type: String, required: true},
-        lastName: { type: String, required: true}
+        type: Number,
+        required: true
     },
     editedAt: {
         type: Date,

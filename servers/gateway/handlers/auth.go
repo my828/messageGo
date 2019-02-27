@@ -66,6 +66,8 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		
+		// add user to trie
 		c.SearchIndex.SplitNameAddToTrie(user.UserName, user.ID)
 		c.SearchIndex.SplitNameAddToTrie(user.FirstName, user.ID)
 		c.SearchIndex.SplitNameAddToTrie(user.LastName, user.ID)
@@ -136,7 +138,6 @@ func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idString := path.Base(r.URL.Path)
-
 	switch r.Method {
 	case http.MethodGet:
 		idIndex, err := strconv.Atoi(idString)

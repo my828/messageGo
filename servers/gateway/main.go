@@ -6,7 +6,6 @@ import (
 	"assignments-my828/servers/gateway/models/users"
 	"assignments-my828/servers/gateway/sessions"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,8 +13,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -106,7 +103,6 @@ func main() {
 		if err != nil {
 			fmt.Printf("error parsing message address: %v\n", err)
 		}
-		fmt.Print("1", parseAddr)
 		messageAddrs = append(messageAddrs, parseAddr)
 	}
 
@@ -115,12 +111,11 @@ func main() {
 		if err != nil {
 			fmt.Printf("error parsing message address: %v\n", err)
 		}
-		fmt.Print("2", parseAddr)
 		summaryAddrs = append(summaryAddrs, parseAddr)
 	}
 
-	messageProxy := &httputil.ReverseProxy{Director: CustomDirector(messageAddrs)}
-	summaryProxy := &httputil.ReverseProxy{Director: CustomDirector(summaryAddrs)}
+	messageProxy := &httputil.ReverseProxy{Director: handlers.CustomDirector(messageAddrs)}
+	summaryProxy := &httputil.ReverseProxy{Director: handlers.CustomDirector(summaryAddrs)}
 
 	mux.Handle("/v1/messages/:messageID", messageProxy)
 	mux.Handle("/v1/channels/:channelID/members", messageProxy)
@@ -136,84 +131,7 @@ func main() {
 
 	//wrap new mux with CORS middleware handler
 	wrappedMux := handlers.NewCorsHandler(mux)
-	
+
 	log.Printf("!!!!!!server is listening at http://%s", addr)
 	log.Fatal(http.ListenAndServeTLS(addr, tlsCertPath, tlsKeyPath, wrappedMux))
 }
-
-type Director func(r *http.Request)
-
-func CustomDirector(targets []*url.URL, c Context) Director {
-	var counter int32
-	counter = 0
-	fmt.Print(1)
-	state := &SessionState{}
-	mx := sync.RWMutex{}
-	mx.Lock()
-	defer mx.Unlock()
-	// log.Println(targets)
-	return func(r *http.Request) {
-		// _targets, _ := rc.Get("MessageAddresses").Result()
-		// targets := strings.Split(_targets, ",")
-		targ := targets[counter%int32(len(targets))]
-		// log.Println(targ)
-		log.Print(2)
-
-		atomic.AddInt32(&counter, 1) // note, to be extra safe, we’ll need to use mutexes
-		counter++
-		_, err := sessions.GetState(r, c.Key, c.SessionStore, state)
-		log.Print(3)
-		if err != nil {
-			r.Header.Del("X-User")
-			fmt.Sprintf("Error getting session state/session unauthorized %v", err)
-			return
-		}
-		// note the modulo (%) operator which maps some integer to range from 0 to
-		// len(targets)
-		j, err := json.Marshal(state.User)
-		if err != nil {
-			fmt.Sprintf("Error encoding session state user %v", err)
-			return
-		}
-		r.URL.Host = targ.Host
-		log.Print(4)
-		r.Host = targ.Host
-		r.URL.Scheme = "http"
-		r.Header.Add("X-User", string(j))
-		r.Header.Add("X-Forwarded-Host", r.Host)
-	}
-}
-
-// // Custom director
-// func CustomDirector(targets []*url.URL, c Context) Director {
-// 	return func(r *http.Request) {
-// 		state := &SessionState{}
-// 		targ := targets[rand.Int() % len(targets)]
-// 		_, err := sessions.GetState(r, c.Key, c.SessionStore, state)
-// 		if err != nil {
-// 			r.Header.Del("X-User")
-// 			fmt.Sprintf("Error getting session state/session unauthorized %v", err)
-// 			return
-// 		}
-// 		// note the modulo (%) operator which maps some integer to range from 0 to
-// 		// len(targets)
-// 		j, err := json.Marshal(state.User)
-// 		if err != nil {
-// 			fmt.Sprintf("Error encoding session state user %v", err)
-// 			return
-// 		}
-// 		r.URL.Host = targ.Host
-// 		r.Host = targ.Host
-// 		r.URL.Scheme = "http"
-// 		r.Header.Add("X-User", string(j))
-// 		// if _, err := sessions.GetState(r, c.Key, c.SessionStore, state); err == nil {
-// 		// 	user, _ := json.Marshal(state.User)
-// 		// 	r.Header.Add("X-User", string(user))
-// 		// } else {
-// 		// 	r.Header.Del("X-User")
-// 		// }
-// 		// r.Host = targ.Host
-// 		// r.URL.Host = targ.Host
-// 		// r.URL.Scheme = "http" // targ.Scheme
-// 	}
-// }

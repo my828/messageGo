@@ -1,6 +1,8 @@
 package sessions
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -17,7 +19,10 @@ type RedisStore struct {
 //NewRedisStore constructs a new RedisStore
 func NewRedisStore(client *redis.Client, sessionDuration time.Duration) *RedisStore {
 	//initialize and return a new RedisStore struct
-	return nil
+	return &RedisStore{
+		client,
+		sessionDuration,
+	}
 }
 
 //Store implementation
@@ -29,6 +34,11 @@ func (rs *RedisStore) Save(sid SessionID, sessionState interface{}) error {
 	//TODO: marshal the `sessionState` to JSON and save it in the redis database,
 	//using `sid.getRedisKey()` for the key.
 	//return any errors that occur along the way.
+	state, err := json.Marshal(sessionState)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: ")
+	}
+	rs.Client.Set(sid.getRedisKey(), state, rs.SessionDuration)
 	return nil
 }
 
@@ -39,17 +49,30 @@ func (rs *RedisStore) Get(sid SessionID, sessionState interface{}) error {
 	//unmarshal it back into the `sessionState` parameter
 	//and reset the expiry time, so that it doesn't get deleted until
 	//the SessionDuration has elapsed.
-
+	session := rs.Client.Get(sid.getRedisKey())
+	if session.Err() != nil {
+		return ErrStateNotFound
+	}
+	buffer, err := session.Result()
+	if err != nil {
+		return fmt.Errorf("Can't convert to bytes %v", err)
+	}
+	if err := json.Unmarshal([]byte(buffer), sessionState); err != nil {
+		return fmt.Errorf("error unmarshaling JSON: %v", err)
+	}
+	rs.Client.Expire(sid.getRedisKey(), rs.SessionDuration)
 	//for extra-credit using the Pipeline feature of the redis
 	//package to do both the get and the reset of the expiry time
 	//in just one network round trip!
-
 	return nil
 }
 
 //Delete deletes all state data associated with the SessionID from the store.
 func (rs *RedisStore) Delete(sid SessionID) error {
-	//TODO: delete the data stored in redis for the provided SessionID
+	err := rs.Client.Del(sid.getRedisKey())
+	if err.Err() != nil {
+		return err.Err()
+	}
 	return nil
 }
 

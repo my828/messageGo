@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const autoIncrement = require('mongoose-auto-increment')
 
 const messageSchema = mongoose.Schema({
     channelID: {
@@ -23,4 +24,5 @@ const messageSchema = mongoose.Schema({
     }
 })
 
+messageSchema.plugin(autoIncrement.plugin, 'Message')
 module.exports = mongoose.model("Message", messageSchema)

@@ -34,6 +34,7 @@ function channel(req, res, next) {
 
 function channelID(req, res, next) {
     var id = req.params.channelID
+    var query = req.query.before
     var user = getUser(req)
     var channel = checkAuth(user, id)
     if (user === null) {
@@ -44,9 +45,13 @@ function channelID(req, res, next) {
         res.status(403).send("Forbidden User")
         return
     }
+
     console.log(req.params.before)
     switch(req.method) {
         case "GET":
+            if (query !== "") {
+
+            }
             Message.find({channelID: ObjectID(id)})
             .sort({$natural: -1})
             .limit(100)

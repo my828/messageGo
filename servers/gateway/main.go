@@ -114,13 +114,13 @@ func main() {
 		summaryAddrs = append(summaryAddrs, parseAddr)
 	}
 
-	messageProxy := &httputil.ReverseProxy{Director: handlers.CustomDirector(messageAddrs)}
-	summaryProxy := &httputil.ReverseProxy{Director: handlers.CustomDirector(summaryAddrs)}
+	messageProxy := &httputil.ReverseProxy{Director: context.CustomDirector(messageAddrs)}
+	summaryProxy := &httputil.ReverseProxy{Director: context.CustomDirector(summaryAddrs)}
 
 	mux.Handle("/v1/messages/:messageID", messageProxy)
 	mux.Handle("/v1/channels/:channelID/members", messageProxy)
 	mux.Handle("/v1/channels/:channelID", messageProxy)
-	mux.Handle("/v1/channel", messageProxy)
+	mux.Handle("/v1/channels", messageProxy)
 
 	mux.Handle("/v1/summary", summaryProxy)
 

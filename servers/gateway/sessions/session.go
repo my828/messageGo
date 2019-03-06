@@ -27,7 +27,7 @@ func BeginSession(signingKey string, store Store, sessionState interface{}, w ht
 	//    "Authorization: Bearer <sessionID>"
 	//  where "<sessionID>" is replaced with the newly-created SessionID
 	//  (note the constants declared for you above, which will help you avoid typos)
-	
+
 	sessionID, err := NewSessionID(signingKey)
 	if err != nil {
 		return InvalidSessionID, fmt.Errorf("Not able to get sessionID %v", err)
@@ -46,13 +46,14 @@ func GetSessionID(r *http.Request, signingKey string) (SessionID, error) {
 	//and validate it. If it's valid, return the SessionID. If not
 	//return the validation error.
 	auth := r.Header.Get(headerAuthorization)
-	if auth == "" {
+	if len(auth) == 0 {
 		auth = r.URL.Query().Get(paramAuthorization)
+		fmt.Print(auth)
 	}
-	if !strings.Contains(auth, schemeBearer) {
+	if len(auth) == 0 {
 		return InvalidSessionID, ErrInvalidScheme
 	}
-	id := strings.Split(auth, " ")[1]
+	id := strings.Replace(auth, schemeBearer, "", 1)
 	sessionID, err := ValidateID(id, signingKey)
 	if err != nil {
 		return InvalidSessionID, err

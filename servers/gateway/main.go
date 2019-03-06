@@ -17,7 +17,15 @@ import (
 
 	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/websocket"
+	"github.com/streadway/amqp"
 )
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+	}
+}
 
 //main is the main entry point for the server
 func main() {
@@ -94,6 +102,7 @@ func main() {
 		fmt.Printf("error pinging database: %v\n", err)
 	}
 
+	// convert addresses to url
 	messageAddr := strings.Split(os.Getenv("MESSAGEADDR"), ",")
 	summaryAddr := strings.Split(os.Getenv("SUMMARYADDR"), ",")
 	messageAddrs := []*url.URL{}
@@ -114,6 +123,47 @@ func main() {
 		summaryAddrs = append(summaryAddrs, parseAddr)
 	}
 
+	socket := handlers.SocketStore{
+		Connections: make(map[int64]*websocket.Conn),
+		Context:     context,
+	}
+
+	// Rabbit connection
+
+	rabbit := os.Getenv("QNAME")
+	conn, err := amqp.Dial("amqp://rabbit:5672/")
+	failOnError(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	//start channel
+	ch, err := conn.Channel()
+	failOnError(err, "Failed to open a channel")
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		rabbit, // name
+		false,  // durable
+		false,  // delete when usused
+		false,  // exclusive
+		false,  // no-wait
+		nil,    // arguments
+	)
+	failOnError(err, "Failed to declare a queue")
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+
+	failOnError(err, "Failed to register a consumer")
+
+	go socket.ConsumeMessage(msgs)
+
+	// proxy
 	messageProxy := &httputil.ReverseProxy{Director: context.CustomDirector(messageAddrs)}
 	summaryProxy := &httputil.ReverseProxy{Director: context.CustomDirector(summaryAddrs)}
 
@@ -128,6 +178,8 @@ func main() {
 	mux.HandleFunc("/v1/users/", context.SpecificUserHandler)
 	mux.HandleFunc("/v1/sessions", context.SessionsHandler)
 	mux.HandleFunc("/v1/sessions/", context.SpecificSessionHandler)
+
+	mux.HandleFunc("/v1/ws", socket.WebSocketConnectionHandler)
 
 	//wrap new mux with CORS middleware handler
 	wrappedMux := handlers.NewCorsHandler(mux)

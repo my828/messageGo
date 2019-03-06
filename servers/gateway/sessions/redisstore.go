@@ -38,7 +38,10 @@ func (rs *RedisStore) Save(sid SessionID, sessionState interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: ")
 	}
-	rs.Client.Set(sid.getRedisKey(), state, rs.SessionDuration)
+	statusCmd := rs.Client.Set(sid.getRedisKey(), state, rs.SessionDuration)
+	if statusCmd.Err() != redis.Nil {
+		return fmt.Errorf("Error setting state")
+	}
 	return nil
 }
 
@@ -50,7 +53,7 @@ func (rs *RedisStore) Get(sid SessionID, sessionState interface{}) error {
 	//and reset the expiry time, so that it doesn't get deleted until
 	//the SessionDuration has elapsed.
 	session := rs.Client.Get(sid.getRedisKey())
-	if session.Err() != nil {
+	if session.Err() != redis.Nil {
 		return ErrStateNotFound
 	}
 	buffer, err := session.Result()
@@ -60,7 +63,10 @@ func (rs *RedisStore) Get(sid SessionID, sessionState interface{}) error {
 	if err := json.Unmarshal([]byte(buffer), sessionState); err != nil {
 		return fmt.Errorf("error unmarshaling JSON: %v", err)
 	}
-	rs.Client.Expire(sid.getRedisKey(), rs.SessionDuration)
+	cmd := rs.Client.Expire(sid.getRedisKey(), rs.SessionDuration)
+	if cmd.Err() != redis.Nil {
+		return fmt.Errorf("Error expire %v", err)
+	}
 	//for extra-credit using the Pipeline feature of the redis
 	//package to do both the get and the reset of the expiry time
 	//in just one network round trip!

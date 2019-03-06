@@ -11,13 +11,6 @@ import (
 	sqlmock "gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
-const GETID = "select * from users where id=?"
-const GETEMAIL = "select * from users where email=?"
-const GETUSER = "select * from users where userName=?"
-const INSERTSTATEMENT = "insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
-const UPDATESTATEMENT = "update users set firstName=?, lastName=? where id=?"
-const DELETESTATEMENT = "delete from users where id=?"
-
 func TestMySQLStore_GetByID(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 )
 
 //InvalidSessionID represents an empty, invalid session ID
@@ -54,9 +53,9 @@ func NewSessionID(signingKey string) (SessionID, error) {
 	salt := make([]byte, idLength)
 	_, err := rand.Read(salt)
 	if err != nil {
-		fmt.Printf("error generating salt: %v\n", err)
-		os.Exit(1)
+		return InvalidSessionID, fmt.Errorf("error generating salt: %v\n", err)
 	}
+
 	//create a new HMAC hasher
 	hash := hmac.New(sha256.New, []byte(signingKey))
 	hash.Write(salt)

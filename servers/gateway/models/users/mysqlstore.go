@@ -6,6 +6,13 @@ import (
 	"fmt"
 )
 
+const GETID = "select * from users where id=?"
+const GETEMAIL = "select * from users where email=?"
+const GETUSER = "select * from users where userName=?"
+const INSERTSTATEMENT = "insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
+const UPDATESTATEMENT = "update users set firstName=?, lastName=? where id=?"
+const DELETESTATEMENT = "delete from users where id=?"
+const INSERTSIGNIN = "insert into signinuser(userID, signinDatetime, ipAddress) values (?,?,?)"
 type SQLStore struct {
 	Db *sql.DB
 }
@@ -56,7 +63,7 @@ func (sqls *SQLStore) RefactorGetBy(input string, what string) (*User, error) {
 
 //GetByID returns the User with the given ID
 func (sqls *SQLStore) GetByID(id int64) (*User, error) {
-	rows, err := sqls.Db.Query("select * from users where id=?", id)
+	rows, err := sqls.Db.Query(GETID, id)
 	if err != nil {
 		return &User{}, fmt.Errorf("Error getting data by id: %v", err)
 	}
@@ -86,8 +93,7 @@ func (sqls *SQLStore) GetByUserName(username string) (*User, error) {
 //Insert inserts the user into the database, and returns
 //the newly-inserted User, complete with the DBMS-assigned ID
 func (sqls *SQLStore) Insert(user *User) (*User, error) {
-	insq := "insert into users(email, passHash, userName, firstName, lastName, photoUrl) values (?,?,?,?,?,?)"
-	res, err := sqls.Db.Exec(insq, user.Email, user.PassHash, user.UserName,
+	res, err := sqls.Db.Exec(INSERTSTATEMENT, user.Email, user.PassHash, user.UserName,
 		user.FirstName, user.LastName, user.PhotoURL)
 
 	if err != nil {
@@ -106,19 +112,16 @@ func (sqls *SQLStore) Insert(user *User) (*User, error) {
 //Update applies UserUpdates to the given user ID
 //and returns the newly-updated user
 func (sqls *SQLStore) Update(id int64, updates *Updates) (*User, error) {
-	insq := "update users set firstName=?, lastName=? where id=?"
-	_, err := sqls.Db.Exec(insq, updates.FirstName, updates.LastName, id)
+	_, err := sqls.Db.Exec(UPDATESTATEMENT, updates.FirstName, updates.LastName, id)
 	if err != nil {
 		return &User{}, fmt.Errorf("error updating database %v", err)
 	}
-
 	return sqls.GetByID(id)
 }
 
 //Delete deletes the user with the given ID
 func (sqls *SQLStore) Delete(id int64) error {
-	insq := "delete from users where id=?"
-	_, err := sqls.Db.Exec(insq, id)
+	_, err := sqls.Db.Exec(DELETESTATEMENT, id)
 	if err != nil {
 		return fmt.Errorf("error deleteing from database %v", err)
 	}
@@ -127,8 +130,7 @@ func (sqls *SQLStore) Delete(id int64) error {
 
 // insert new signin session
 func (sqls *SQLStore) InsertSignin(signin *SignIn) error {
-	insq := "insert into signinuser(userID, signinDatetime, ipAddress) values (?,?,?)"
-	_, err := sqls.Db.Exec(insq, signin.Id, signin.Time, signin.Ip)
+	_, err := sqls.Db.Exec(INSERTSIGNIN, signin.Id, signin.Time, signin.Ip)
 
 	if err != nil {
 		return fmt.Errorf("error inserting new row to signinuser: %v\n", err)

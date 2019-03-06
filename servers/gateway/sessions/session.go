@@ -48,11 +48,15 @@ func GetSessionID(r *http.Request, signingKey string) (SessionID, error) {
 	auth := r.Header.Get(headerAuthorization)
 	if len(auth) == 0 {
 		auth = r.URL.Query().Get(paramAuthorization)
-		fmt.Print(auth)
+		if len(auth) == 0 {
+			return InvalidSessionID, fmt.Errorf("Authorization is not valid")
+		}
 	}
-	if len(auth) == 0 {
+
+	if !strings.HasPrefix(auth, schemeBearer) {
 		return InvalidSessionID, ErrInvalidScheme
 	}
+
 	id := strings.Replace(auth, schemeBearer, "", 1)
 	sessionID, err := ValidateID(id, signingKey)
 	if err != nil {
@@ -87,6 +91,9 @@ func EndSession(r *http.Request, signingKey string, store Store) (SessionID, err
 	if err != nil {
 		return InvalidSessionID, fmt.Errorf("Invalid session ID")
 	}
-	store.Delete(sessionID)
+	err = store.Delete(sessionID)
+	if err != nil {
+		return InvalidSessionID, fmt.Errorf("Cannot delete data from provided store")
+	}
 	return sessionID, nil
 }

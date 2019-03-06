@@ -2,6 +2,7 @@ const mongoose = require("mongoose")
 const Channel = require("../models/channel")
 const Message = require("../models/message")
 const ObjectID = require('mongodb').ObjectID;
+const ch = require("../../index")
 
 function message(req, res, next) {
     var id = req.params.messageID
@@ -15,9 +16,10 @@ function message(req, res, next) {
         res.status(403).send("Forbidden User")
         return
     }
+
     switch (req.method) {
         case "PATCH": 
-        Channel.findOneAndUpdate(
+        Message.findOneAndUpdate(
             {
                 _id: id
             }, 
@@ -32,12 +34,31 @@ function message(req, res, next) {
                 } else {
                     res.status(201).json(doc)
                 }
+                Channel.find({_id: message.channelID}).then(channel => {chan = channel}).catch()
+
+                e = {
+                    type: "message-update",
+                    message: doc,
+                    userIDs: channel.private ? channel.members : []
+                }
+                ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)));
             }
         )
         break;
         case "DELETE":
+            let mes;
+            Channel.find({_id: ObjectID(id)}).then(message => {mes = message}).catch()
+
             Message.remove({_id: ObjectID(id)})
-            .then(res.status(200).send("Delete message success!"))
+            .then(
+                () => {res.status(200).send("Delete message success!")
+                e = {
+                    type: "message-update",
+                    messageID: id,
+                    userIDs: channel.private ? channel.members : []
+                }
+                ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)))
+            })
             .catch(err => res.status(404).send('unable to delete message: ' + err))
         break;
         default: 

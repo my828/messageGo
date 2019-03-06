@@ -2,7 +2,7 @@ const mongoose = require("mongoose")
 const Channel = require("../models/channel")
 const Message = require("../models/message")
 const ObjectID = require('mongodb').ObjectID;
-
+const ch = require("../../index")
 function channel(req, res, next) {
     //initialize list of channels to store current user's channels
     var user = getUser(req)
@@ -23,7 +23,15 @@ function channel(req, res, next) {
             break;
         case "POST": 
             Channel.create(req.body).then(
-                channel => res.status(201).json(channel)
+                channel => {
+                    res.status(201).json(channel)
+                    e = {
+                        type: "channel-new",
+                        channel: channel,
+                        userIDs: channel.private ? channel.members : []
+                    }
+                    ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)));
+                }
             ).catch(err => res.status(404).send('Cannot create channel' + err));
             break;
         default: 
@@ -46,7 +54,6 @@ function channelID(req, res, next) {
         return
     }
 
-    console.log(req.params.before)
     switch(req.method) {
         case "GET":
             if (query !== "") {
@@ -68,12 +75,22 @@ function channelID(req, res, next) {
                 body: req.body.body,
                 creator: user.id
             })
+            let chan;
+            Channel.find({_id: message.channelID}).then(channel => {chan = channel}).catch()
             message.save()
                 .then(
-                    message => res.status(201).json(message)
+                    message => {
+                        res.status(201).json(message)
+                        e = {
+                            type: "message-new",
+                            message: message,
+                            userIDs: chan.private ? chan.members : []
+                        }
+                        ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)));                       
+                    }
                 )
                 .catch(
-                    err => res.status(404).send('Cannot create channel ' + err)
+                    err => res.status(404).send('Cannot create message ' + err)
             );
             break;
         case "PATCH": 
@@ -90,11 +107,18 @@ function channelID(req, res, next) {
                 {
                     returnNewDocument: true
                 }, function(err, doc) {
+                    
                     if (err) {
                         res.status(404).send("Unable update channel: " + err)
                     } else {
                         res.status(201).json(doc)
                     }
+                    e = {
+                        type: "channel-update",
+                        channel: doc,
+                        userIDs: doc.private ? doc.members : []
+                    }
+                    ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)));        
                 }
             )
             break;
@@ -104,8 +128,17 @@ function channelID(req, res, next) {
             if (user.id == "-1") {
                 isGeneral = true
             } else {
-                Channel.findOneAndDelete({_id: ObjectID(id)})
-                .then()
+                Channel.findOneAndDelete({_id: ObjectID(id)},{
+                    returnNewDocument: true
+                })
+                .then(channel => {
+                    e = {
+                        type: "channel-delete",
+                        channel: channel,
+                        userIDs: channel.private ? channel.members : []
+                    }
+                    ch.chan.sendToQueue(ch.q, new Buffer(JSON.stringify(e)));
+                })
                 .catch(err => error = error + " " + err)
                 Message.deleteMany({channelID: ObjectID(id)})
                 .then()

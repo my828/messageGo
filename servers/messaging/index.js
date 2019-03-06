@@ -10,6 +10,22 @@ const autoIncrement = require('mongoose-auto-increment')
 //create a new express application
 const app = express();
 
+let channel = {};
+
+var amqp = require('amqplib/callback_api');
+amqp.connect('amqp://' + process.env.QNAME + ":5672/", function(err, conn) {
+  conn.createChannel(function(err, ch) {
+    let q = process.env.QNAME 
+
+    ch.assertQueue(q, {durable: false});
+    // Note: on Node 6 Buffer.from(msg) should be used
+    channel.chan = ch
+    channel.q = q
+  });
+});
+
+module.exports = channel
+
 var connection = mongoose.createConnection("mongodb://mongodb:27017/app")
 autoIncrement.initialize(connection)
 

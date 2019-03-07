@@ -6,7 +6,8 @@ create table if not exists users (
     firstName varchar(64) not null,
     lastName varchar(128) not null,
     photoUrl varchar(128) not null,
-    unique key(email, userName)
+    unique key(email),
+    unique key(userName)
 );
 
 create table if not exists signinuser (

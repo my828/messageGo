@@ -36,11 +36,14 @@ func (rs *RedisStore) Save(sid SessionID, sessionState interface{}) error {
 	//return any errors that occur along the way.
 	state, err := json.Marshal(sessionState)
 	if err != nil {
-		return fmt.Errorf("error marshaling JSON: ")
+		return fmt.Errorf("error marshaling JSON: %v\n", err)
 	}
 	statusCmd := rs.Client.Set(sid.getRedisKey(), state, rs.SessionDuration)
-	if statusCmd.Err() != redis.Nil {
-		return fmt.Errorf("Error setting state")
+	if statusCmd.Err() != nil {
+		if statusCmd.Err() == redis.Nil {
+			return ErrStateNotFound
+		}
+		return fmt.Errorf("Error setting state: %v", statusCmd.Err())
 	}
 	return nil
 }
@@ -53,8 +56,11 @@ func (rs *RedisStore) Get(sid SessionID, sessionState interface{}) error {
 	//and reset the expiry time, so that it doesn't get deleted until
 	//the SessionDuration has elapsed.
 	session := rs.Client.Get(sid.getRedisKey())
-	if session.Err() != redis.Nil {
-		return ErrStateNotFound
+	if session.Err() != nil {
+		if session.Err() == redis.Nil {
+			return ErrStateNotFound
+		}
+		return fmt.Errorf("Error setting state: %v", session.Err())
 	}
 	buffer, err := session.Result()
 	if err != nil {

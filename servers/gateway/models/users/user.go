@@ -102,12 +102,13 @@ func (nu *NewUser) ToUser() (*User, error) {
 	if err := nu.Validate(); err != nil {
 		return &User{}, err
 	}
+	email := strings.TrimSpace(nu.Email)
+	email = strings.ToLower(email)
 	//get hash
 	h := md5.New()
+	h.Write([]byte(email))
 	photourl := gravatarBasePhotoURL + hex.EncodeToString(h.Sum(nil))
-	// if _, err := io.WriteString(h, nu.Email); err != nil {
-	// 	return &User{}, err
-	// }
+
 	user := &User{
 		0,
 		nu.Email,
@@ -184,3 +185,4 @@ func (nu *NewUser) ParseAddress(email string) error {
 	nu.Email = strings.ToLower(add.Address)
 	return nil
 }
+

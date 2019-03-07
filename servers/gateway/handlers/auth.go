@@ -55,18 +55,17 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 		// convert new user to user
 		user, err := newUser.ToUser()
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 
 		// insert to database
-		//fmt.Printf("##### %d\n", c.UsersStore)
 		user, err = c.UsersStore.Insert(user)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
-		
+
 		// add user to trie
 		c.SearchIndex.SplitNameAddToTrie(user.UserName, user.ID)
 		c.SearchIndex.SplitNameAddToTrie(user.FirstName, user.ID)
@@ -80,7 +79,7 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 		// being new session for new user
 		_, err = sessions.BeginSession(c.Key, c.SessionStore, state, w)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), 400)
 			return
 		}
 
@@ -133,22 +132,28 @@ func (c *Context) UsersHandler(w http.ResponseWriter, r *http.Request) {
 func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 	state := &SessionState{}
 
-	if _, err := sessions.GetState(r, c.Key, c.SessionStore, state); err != nil {
+	_, err := sessions.GetState(r, c.Key, c.SessionStore, state); 
+	if err != nil {
 		http.Error(w, fmt.Sprintf("Unable get state: %v", err), http.StatusUnauthorized)
 		return
 	}
-	idString := path.Base(r.URL.Path)
-	switch r.Method {
-	case http.MethodGet:
-		idIndex, err := strconv.Atoi(idString)
+	var userID int64
+	id := path.Base(r.URL.Path)
+	if id == "me" {
+		userID = state.User.ID
+	} else {
+		userID, err = strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Did not provide {id} as a number in /v1/user/{id}, please provide the corrct ID"),
 				http.StatusBadRequest)
 			return
 		}
-		user, err := c.UsersStore.GetByID(int64(idIndex))
+	}
+	switch r.Method {
+	case http.MethodGet:
+		user, err := c.UsersStore.GetByID(userID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("ID provided does not exist in data store"), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("ID provided does not exist in data store"), http.StatusBadRequest)
 			return
 		}
 
@@ -160,17 +165,9 @@ func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case http.MethodPatch:
-		if idString != "me" {
-			idIndex, err := strconv.Atoi(idString)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Did not provide {id} as a number in /v1/user/{id}, please provide the corrct ID"),
-					http.StatusBadRequest)
-				return
-			}
-			if int64(idIndex) != state.User.ID {
-				http.Error(w, fmt.Sprint("Incorrect user ID"), http.StatusForbidden)
-				return
-			}
+		if userID != state.User.ID {
+			http.Error(w, fmt.Sprint("Incorrect user ID"), http.StatusForbidden)
+			return
 		}
 
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
@@ -184,16 +181,19 @@ func (c *Context) SpecificUserHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusBadRequest)
 			return
 		}
-		c.SearchIndex.Remove(state.User.FirstName, state.User.ID)
-		c.SearchIndex.Remove(state.User.LastName, state.User.ID)
-		c.SearchIndex.Add(update.FirstName, state.User.ID)
-		c.SearchIndex.Add(update.LastName, state.User.ID)
 
 		user, err := c.UsersStore.Update(state.User.ID, update)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error updating user %v:", err), http.StatusBadRequest)
 			return
 		}
+
+		c.SearchIndex.Remove(state.User.FirstName, state.User.ID)
+		c.SearchIndex.Remove(state.User.LastName, state.User.ID)
+		c.SearchIndex.Add(update.FirstName, state.User.ID)
+		c.SearchIndex.Add(update.LastName, state.User.ID)
+
+
 		w.Header().Add(ContentTypeHeader, ContentTypeApplicationJSON)
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(user); err != nil {
